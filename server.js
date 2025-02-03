@@ -24,8 +24,8 @@ const rooms = new Map();
 const users = new Map();
 
 // Middleware
-app.use(express.static('public'));
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // CORS middleware
 app.use((req, res, next) => {
@@ -104,14 +104,17 @@ app.get('/', (req, res) => {
 // Handle room routes
 app.get('/room/:roomId', (req, res) => {
     const { roomId } = req.params;
+    console.log('Accessing room:', roomId);
     
     // Validate room ID format
     if (!/^[A-Z0-9]{6}$/.test(roomId)) {
+        console.log('Invalid room ID format:', roomId);
         return res.redirect('/');
     }
     
     // Create room if it doesn't exist
     if (!rooms.has(roomId)) {
+        console.log('Creating new room:', roomId);
         rooms.set(roomId, {
             id: roomId,
             users: new Set(),
@@ -121,7 +124,15 @@ app.get('/room/:roomId', (req, res) => {
         });
     }
     
-    res.sendFile(path.join(__dirname, 'public', 'room.html'));
+    // Send room.html file
+    const roomHtmlPath = path.join(__dirname, 'public', 'room.html');
+    console.log('Serving room.html from:', roomHtmlPath);
+    res.sendFile(roomHtmlPath);
+});
+
+// Catch-all route for static files
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', req.path));
 });
 
 // Socket connection handling

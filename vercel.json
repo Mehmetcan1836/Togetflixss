@@ -20,16 +20,16 @@
       "dest": "/server.js"
     },
     {
+      "src": "/room/[A-Z0-9]{6}",
+      "dest": "/server.js"
+    },
+    {
       "src": "/js/(.*)",
       "dest": "/public/js/$1"
     },
     {
       "src": "/css/(.*)",
       "dest": "/public/css/$1"
-    },
-    {
-      "src": "/room/[A-Z0-9]+",
-      "dest": "/public/room.html"
     },
     {
       "src": "/assets/(.*)",
@@ -40,7 +40,7 @@
       "dest": "/public/index.html"
     },
     {
-      "src": "/(.*)",
+      "src": "/((?!api|socket.io|room).*)",
       "dest": "/public/$1"
     }
   ],
