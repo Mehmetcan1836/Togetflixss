@@ -32,8 +32,18 @@ app.use((req, res, next) => {
     }
 });
 
-// Serve static files
-app.use(express.static('public'));
+// Serve static files with proper MIME types
+app.use(express.static('public', {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        }
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+}));
+
 app.use(express.json());
 
 // Store room and user information
