@@ -20,7 +20,7 @@
       "dest": "/server.js"
     },
     {
-      "src": "/room/[A-Z0-9]{6}",
+      "src": "js/room/[A-Z0-9]{6}",
       "dest": "/server.js"
     },
     {
