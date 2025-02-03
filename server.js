@@ -1,23 +1,24 @@
 const express = require('express');
 const app = express();
-const server = require('http').Server(app);
-const io = require('socket.io')(server, {
-    path: '/socket.io/',
-    serveClient: true,
+const http = require('http').createServer(app);
+const io = require('socket.io')(http, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["X-Requested-With", "Content-Type", "Accept"],
+        methods: ["GET", "POST"],
+        transports: ['websocket', 'polling'],
         credentials: true
     },
-    transports: ['polling', 'websocket'],
-    pingInterval: 10000,
-    pingTimeout: 5000,
+    allowEIO3: true,
+    path: '/socket.io/',
+    serveClient: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
     upgradeTimeout: 30000,
-    allowUpgrades: true
+    maxHttpBufferSize: 1e8
 });
 
 const path = require('path');
+const PORT = process.env.PORT || 3000;
 
 // Store active rooms and users
 const rooms = new Map();
@@ -271,7 +272,6 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-const port = process.env.PORT || 3000;
-server.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+http.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
