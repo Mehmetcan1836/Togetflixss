@@ -1,9 +1,10 @@
 // Initialize socket connection
-const socket = io({
+const socket = io(window.location.origin, {
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 5,
-    reconnectionDelay: 1000
+    reconnectionDelay: 1000,
+    path: '/socket.io/'
 });
 
 // Initialize room functionality
