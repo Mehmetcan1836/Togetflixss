@@ -8,8 +8,7 @@ const io = require('socket.io')(server, {
         allowedHeaders: ["*"],
         credentials: true
     },
-    path: '/socket.io/',
-    transports: ['websocket', 'polling']
+    transports: ['polling', 'websocket']
 });
 
 const path = require('path');
@@ -34,20 +33,46 @@ app.use((req, res, next) => {
     }
 });
 
-// Generate random avatar
-function getRandomAvatar() {
-    const avatarTypes = ['adventurer', 'adventurer-neutral', 'avataaars', 'big-ears', 'big-ears-neutral', 'big-smile'];
-    const type = avatarTypes[Math.floor(Math.random() * avatarTypes.length)];
-    return `https://api.dicebear.com/6.x/${type}/svg?seed=${Math.random()}`;
+// Generate random room ID
+function generateRoomId() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// Generate random username
-function generateUsername() {
-    const adjectives = ['Happy', 'Lucky', 'Sunny', 'Clever', 'Swift', 'Bright'];
-    const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Lion', 'Fox'];
-    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}`;
-}
+// API Routes
+app.post('/api/rooms', (req, res) => {
+    try {
+        const roomId = generateRoomId();
+        rooms.set(roomId, {
+            users: new Set(),
+            screenSharer: null,
+            createdAt: Date.now()
+        });
+        res.json({ roomId, created: true });
+    } catch (error) {
+        console.error('Error creating room:', error);
+        res.status(500).json({ error: 'Failed to create room' });
+    }
+});
 
+app.get('/api/rooms/:roomId', (req, res) => {
+    try {
+        const { roomId } = req.params;
+        const room = rooms.get(roomId);
+        if (room) {
+            const roomUsers = Array.from(room.users)
+                .map(userId => users.get(userId))
+                .filter(Boolean);
+            res.json({ exists: true, users: roomUsers });
+        } else {
+            res.status(404).json({ exists: false });
+        }
+    } catch (error) {
+        console.error('Error getting room:', error);
+        res.status(500).json({ error: 'Failed to get room info' });
+    }
+});
+
+// Socket connection handling
 io.on('connection', socket => {
     console.log('User connected:', socket.id);
 
@@ -58,8 +83,8 @@ io.on('connection', socket => {
                 users.set(userId, {
                     id: userId,
                     socketId: socket.id,
-                    name: generateUsername(),
-                    avatar: getRandomAvatar(),
+                    name: `User ${Math.random().toString(36).substring(2, 6)}`,
+                    avatar: `https://api.dicebear.com/6.x/adventurer/svg?seed=${userId}`,
                     roomId: roomId
                 });
             }
@@ -85,7 +110,7 @@ io.on('connection', socket => {
             // Send current users in room to the new user
             const roomUsers = Array.from(room.users)
                 .map(id => users.get(id))
-                .filter(u => u !== undefined);
+                .filter(Boolean);
 
             socket.emit('room-users', roomUsers);
 
@@ -104,16 +129,6 @@ io.on('connection', socket => {
                 }
             });
 
-            // Handle chat messages
-            socket.on('chat-message', message => {
-                io.to(roomId).emit('chat-message', {
-                    userId,
-                    userName: user.name,
-                    message,
-                    timestamp: Date.now()
-                });
-            });
-
         } catch (error) {
             console.error('Error in join-room:', error);
             socket.emit('error', 'Failed to join room');
@@ -121,23 +136,26 @@ io.on('connection', socket => {
     });
 
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        // Find and remove user from their room
-        for (const [roomId, room] of rooms.entries()) {
-            for (const userId of room.users) {
-                const user = users.get(userId);
-                if (user && user.socketId === socket.id) {
-                    room.users.delete(userId);
-                    io.to(roomId).emit('user-disconnected', userId);
-                    users.delete(userId);
-                    
-                    // Clean up empty rooms
-                    if (room.users.size === 0) {
-                        rooms.delete(roomId);
+        try {
+            // Find and remove user from their room
+            for (const [roomId, room] of rooms.entries()) {
+                for (const userId of room.users) {
+                    const user = users.get(userId);
+                    if (user && user.socketId === socket.id) {
+                        room.users.delete(userId);
+                        io.to(roomId).emit('user-disconnected', userId);
+                        users.delete(userId);
+                        
+                        // Clean up empty rooms
+                        if (room.users.size === 0) {
+                            rooms.delete(roomId);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
+        } catch (error) {
+            console.error('Error in disconnect:', error);
         }
     });
 });

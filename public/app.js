@@ -1,15 +1,16 @@
 // Initialize socket connection
 const socket = io(window.location.origin, {
-    path: '/socket.io/',
-    transports: ['websocket', 'polling'],
+    path: '/socket.io',
+    transports: ['polling', 'websocket'],
+    upgrade: true,
+    rememberUpgrade: true,
+    secure: true,
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     timeout: 20000,
-    upgrade: true,
-    rememberUpgrade: true,
-    secure: true,
-    rejectUnauthorized: false
+    autoConnect: true,
+    forceNew: true
 });
 
 // Handle socket connection events
@@ -19,106 +20,73 @@ socket.on('connect', () => {
 
 socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
+    // Try to reconnect with polling if WebSocket fails
+    if (socket.io.opts.transports.includes('websocket')) {
+        console.log('Falling back to polling transport');
+        socket.io.opts.transports = ['polling'];
+        socket.connect();
+    }
 });
 
 socket.on('disconnect', (reason) => {
     console.log('Socket disconnected:', reason);
+    if (reason === 'io server disconnect') {
+        // Try to reconnect if server disconnected
+        socket.connect();
+    }
 });
 
 // Initialize room functionality
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded');
-    
-    const createRoomBtn = document.getElementById('create-room');
-    const joinRoomBtn = document.getElementById('join-room');
-    const roomIdInput = document.getElementById('room-id');
-    
-    console.log('Buttons:', { createRoomBtn, joinRoomBtn, roomIdInput });
-    
-    if (createRoomBtn) {
-        createRoomBtn.addEventListener('click', async () => {
-            console.log('Create room clicked');
-            await createRoom();
-        });
-    }
-    
-    if (joinRoomBtn && roomIdInput) {
-        // Enable join button only if room ID is entered
-        roomIdInput.addEventListener('input', () => {
-            joinRoomBtn.disabled = !roomIdInput.value.trim();
-        });
+    const createRoomBtn = document.getElementById('createRoom');
+    const joinRoomBtn = document.getElementById('joinRoom');
+    const roomInput = document.getElementById('roomInput');
 
-        // Join room on button click
-        joinRoomBtn.addEventListener('click', () => {
-            const roomId = roomIdInput.value.trim();
-            if (roomId) {
-                joinRoom(roomId);
-            } else {
-                alert('Lütfen bir oda ID girin.');
+    createRoomBtn?.addEventListener('click', async () => {
+        console.log('Create room clicked');
+        try {
+            const room = await createRoom();
+            if (room) {
+                window.location.href = `/room/${room.roomId}`;
             }
-        });
+        } catch (error) {
+            console.error('Error creating room:', error);
+            alert('Failed to create room. Please try again.');
+        }
+    });
 
-        // Join room on Enter key
-        roomIdInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && roomIdInput.value.trim()) {
-                e.preventDefault();
-                joinRoom(roomIdInput.value.trim());
-            }
-        });
-    }
+    joinRoomBtn?.addEventListener('click', () => {
+        const roomId = roomInput.value.trim().toUpperCase();
+        if (roomId) {
+            window.location.href = `/room/${roomId}`;
+        } else {
+            alert('Please enter a room ID');
+        }
+    });
 });
 
 async function createRoom() {
+    console.log('Creating room...');
     try {
-        console.log('Creating room...');
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
         const response = await fetch('/api/rooms', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            },
-            signal: controller.signal
+            }
         });
-        
-        clearTimeout(timeoutId);
+
         console.log('Response:', response);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
         console.log('Room created:', data);
-        
-        if (data.roomId) {
-            window.location.href = `/room?roomId=${data.roomId}`;
-        } else {
-            throw new Error('No room ID received');
-        }
+        return data;
     } catch (error) {
         console.error('Error creating room:', error);
-        if (error.name === 'AbortError') {
-            alert('Oda oluşturma zaman aşımına uğradı. Lütfen tekrar deneyin.');
-        } else {
-            alert('Oda oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
-        }
-    }
-}
-
-async function joinRoom(roomId) {
-    try {
-        const response = await fetch(`/api/rooms/${roomId}`);
-        const data = await response.json();
-        
-        if (data.exists) {
-            window.location.href = `/room?roomId=${roomId}`;
-        } else {
-            alert('Oda bulunamadı.');
-        }
-    } catch (error) {
-        console.error('Error joining room:', error);
-        alert('Odaya katılırken bir hata oluştu.');
+        throw error;
     }
 }

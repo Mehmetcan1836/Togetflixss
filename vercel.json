@@ -13,79 +13,37 @@
   "routes": [
     {
       "src": "/socket.io/(.*)",
-      "dest": "/server.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-        "Access-Control-Allow-Credentials": "true"
-      },
-      "continue": true
-    },
-    {
-      "src": "/public/(.*)",
-      "dest": "/public/$1",
-      "headers": {
-        "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/(.*\\.(js|css|svg|png|jpg|jpeg|gif|ico|json))",
-      "dest": "/public/$1",
-      "headers": {
-        "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/styles.css",
-      "dest": "/public/styles.css",
-      "headers": {
-        "content-type": "text/css",
-        "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/app.js",
-      "dest": "/public/app.js",
-      "headers": {
-        "content-type": "application/javascript",
-        "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/room.js",
-      "dest": "/public/room.js",
-      "headers": {
-        "content-type": "application/javascript",
-        "cache-control": "public, max-age=31536000, immutable"
-      }
+      "dest": "server.js"
     },
     {
       "src": "/api/(.*)",
-      "dest": "/server.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-        "Access-Control-Allow-Credentials": "true"
-      }
+      "dest": "server.js"
     },
     {
       "src": "/room/(.*)",
-      "dest": "/server.js"
+      "dest": "server.js"
     },
     {
-      "handle": "filesystem"
+      "src": "/(.*\\.js)",
+      "dest": "/public/$1",
+      "headers": {
+        "content-type": "application/javascript"
+      }
+    },
+    {
+      "src": "/(.*\\.css)",
+      "dest": "/public/$1",
+      "headers": {
+        "content-type": "text/css"
+      }
+    },
+    {
+      "src": "/(.*\\.(png|jpg|jpeg|gif|ico|svg))",
+      "dest": "/public/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/server.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-        "Access-Control-Allow-Credentials": "true"
-      }
+      "dest": "server.js"
     }
   ],
   "env": {
