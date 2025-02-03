@@ -32,24 +32,16 @@
       }
     },
     {
-      "src": "/room.js",
-      "dest": "/public/js/room.js",
+      "src": "/js/(.*\\.js)",
+      "dest": "/public/js/$1",
       "headers": {
         "Content-Type": "application/javascript",
         "Cache-Control": "public, max-age=31536000, immutable"
       }
     },
     {
-      "src": "/app.js",
-      "dest": "/public/app.js",
-      "headers": {
-        "Content-Type": "application/javascript",
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/styles.css",
-      "dest": "/public/styles.css",
+      "src": "/css/(.*\\.css)",
+      "dest": "/public/css/$1",
       "headers": {
         "Content-Type": "text/css",
         "Cache-Control": "public, max-age=31536000, immutable"
@@ -61,7 +53,7 @@
     },
     {
       "src": "/(.*\\.(ico|png|jpg|jpeg|svg))",
-      "dest": "/public/$1",
+      "dest": "/public/assets/$1",
       "headers": {
         "Cache-Control": "public, max-age=31536000, immutable"
       }

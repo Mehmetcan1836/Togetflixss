@@ -1,21 +1,21 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Watch Share - Ekran Paylaşım Odası</title>
+    <title>Togetflix - Watch Together</title>
     
     <!-- Preload critical resources -->
-    <link rel="preload" href="/styles.css" as="style">
-    <link rel="preload" href="/app.js" as="script">
+    <link rel="preload" href="/css/styles.css" as="style">
+    <link rel="preload" href="/js/app.js" as="script">
     
     <!-- Styles -->
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
     <!-- Meta tags -->
-    <meta name="description" content="Watch Share ile ekranınızı paylaşın ve gerçek zamanlı sohbet edin">
-    <meta name="keywords" content="ekran paylaşımı, video konferans, sohbet">
+    <meta name="description" content="Watch movies together with friends!">
+    <meta name="keywords" content="watch together, movie night, friends">
     
     <style>
         .home-container {
@@ -134,8 +134,8 @@
 <body>
     <div class="home-container">
         <header>
-            <h1 class="logo">Watch Share</h1>
-            <p>Ekranınızı paylaşın ve gerçek zamanlı sohbet edin</p>
+            <h1 class="logo">Togetflix</h1>
+            <p>Watch movies together with friends!</p>
             <div id="connection-status">
                 Status: <span id="status">Connecting...</span>
             </div>
@@ -144,18 +144,18 @@
         <main>
             <div class="room-controls">
                 <div class="create-room">
-                    <h2>Yeni Oda Oluştur</h2>
-                    <button id="create-room" class="btn primary">
-                        <i class="fas fa-plus"></i> Yeni Oda Oluştur
+                    <h2>Create a New Room</h2>
+                    <button id="createRoom" class="btn primary">
+                        <i class="fas fa-plus"></i> Create Room
                     </button>
                 </div>
 
                 <div class="join-room">
-                    <h2>Mevcut Odaya Katıl</h2>
+                    <h2>Join Existing Room</h2>
                     <div class="input-group">
-                        <input type="text" id="room-id" class="room-input" placeholder="Oda ID" maxlength="6">
-                        <button id="join-room" class="btn secondary" disabled>
-                            <i class="fas fa-sign-in-alt"></i> Odaya Katıl
+                        <input type="text" id="roomInput" class="room-input" placeholder="Enter Room ID" maxlength="6">
+                        <button id="joinRoom" class="btn secondary" disabled>
+                            <i class="fas fa-sign-in-alt"></i> Join Room
                         </button>
                     </div>
                 </div>
@@ -163,33 +163,33 @@
         </main>
 
         <div class="features">
-            <h2>Özellikler</h2>
+            <h2>Features</h2>
             <div class="feature-list">
                 <div class="feature-item">
                     <i class="fas fa-desktop"></i>
-                    <h3>Ekran Paylaşımı</h3>
-                    <p>Ekranınızı gerçek zamanlı olarak paylaşın</p>
+                    <h3>Screen Sharing</h3>
+                    <p>Share your screen in real-time</p>
                 </div>
                 <div class="feature-item">
                     <i class="fas fa-comments"></i>
-                    <h3>Sohbet</h3>
-                    <p>Diğer katılımcılarla anlık mesajlaşın</p>
+                    <h3>Chat</h3>
+                    <p>Chat with other participants in real-time</p>
                 </div>
                 <div class="feature-item">
                     <i class="fas fa-microphone"></i>
-                    <h3>Ses Paylaşımı</h3>
-                    <p>Sesinizi diğer katılımcılarla paylaşın</p>
+                    <h3>Audio Sharing</h3>
+                    <p>Share your audio with other participants</p>
                 </div>
             </div>
         </div>
         
         <footer>
-            <p>&copy; 2024 Watch Share. All rights reserved.</p>
+            <p>&copy; 2024 Togetflix. All rights reserved.</p>
         </footer>
     </div>
     
     <!-- Scripts -->
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-    <script src="/app.js"></script>
+    <script src="/js/app.js"></script>
 </body>
 </html>
