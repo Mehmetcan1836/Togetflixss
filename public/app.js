@@ -1,11 +1,15 @@
 // Initialize socket connection
 const socket = io(window.location.origin, {
+    path: '/socket.io/',
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    path: '/socket.io/',
-    timeout: 20000
+    timeout: 20000,
+    upgrade: true,
+    rememberUpgrade: true,
+    secure: true,
+    rejectUnauthorized: false
 });
 
 // Handle socket connection events
@@ -15,6 +19,10 @@ socket.on('connect', () => {
 
 socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error);
+});
+
+socket.on('disconnect', (reason) => {
+    console.log('Socket disconnected:', reason);
 });
 
 // Initialize room functionality

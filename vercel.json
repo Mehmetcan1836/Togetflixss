@@ -16,22 +16,18 @@
       "dest": "/server.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE",
-        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept"
-      }
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        "Access-Control-Allow-Credentials": "true"
+      },
+      "continue": true
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/api/(.*)",
-      "dest": "/server.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE",
-        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept"
-      }
-    },
-    {
-      "src": "/(.*\\.(js|css|svg|ico))",
-      "dest": "/public/$1"
+      "dest": "/server.js"
     },
     {
       "src": "/(.*)",
