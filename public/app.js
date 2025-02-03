@@ -1,5 +1,10 @@
 // Initialize socket connection
-const socket = io();
+const socket = io({
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
+});
 
 // Initialize room functionality
 document.addEventListener('DOMContentLoaded', () => {
