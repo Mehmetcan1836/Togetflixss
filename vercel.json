@@ -13,55 +13,24 @@
   "routes": [
     {
       "src": "/socket.io/(.*)",
-      "dest": "/server.js",
+      "dest": "server.js",
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        "Access-Control-Allow-Headers": "*",
         "Access-Control-Allow-Credentials": "true"
       }
-    },
-    {
-      "src": "/styles.css",
-      "dest": "/public/styles.css",
-      "headers": {
-        "Content-Type": "text/css",
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/app.js",
-      "dest": "/public/app.js",
-      "headers": {
-        "Content-Type": "application/javascript",
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/js/(.*)",
-      "dest": "/public/js/$1",
-      "headers": {
-        "Content-Type": "application/javascript",
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/icons/(.*)",
-      "dest": "/public/icons/$1",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
     },
     {
       "handle": "filesystem"
     },
     {
+      "src": "/api/(.*)",
+      "dest": "server.js"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/server.js"
+      "dest": "server.js"
     }
   ]
 }
