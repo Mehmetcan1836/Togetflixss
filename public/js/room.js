@@ -5,6 +5,15 @@ let screenStream = null;
 let userId = null;
 let roomId = null;
 let isScreenSharing = false;
+let peerConnections = {};
+
+// WebRTC configuration
+const configuration = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
 
 // Initialize socket connection
 function initializeSocket() {
@@ -21,32 +30,44 @@ function initializeSocket() {
     // Socket connection events
     socket.on('connect', () => {
         console.log('Connected to server');
-        document.getElementById('status').textContent = 'Connected';
-        document.getElementById('status').style.color = 'green';
+        updateConnectionStatus(true);
         joinRoom();
     });
 
     socket.on('connect_error', (error) => {
         console.error('Connection error:', error);
-        document.getElementById('status').textContent = 'Connection Error';
-        document.getElementById('status').style.color = 'red';
+        updateConnectionStatus(false);
     });
 
     socket.on('disconnect', (reason) => {
         console.log('Disconnected:', reason);
-        document.getElementById('status').textContent = 'Disconnected';
-        document.getElementById('status').style.color = 'red';
+        updateConnectionStatus(false);
     });
 
     // Room events
-    socket.on('user-connected', (user) => {
+    socket.on('user-connected', async (user) => {
         console.log('User connected:', user);
         addUserToList(user);
+        
+        // If we are currently sharing screen, send it to the new user
+        if (isScreenSharing && screenStream) {
+            const pc = createPeerConnection(user.id);
+            screenStream.getTracks().forEach(track => {
+                pc.addTrack(track, screenStream);
+            });
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('offer', {
+                targetId: user.id,
+                offer: offer
+            });
+        }
     });
 
     socket.on('user-disconnected', (userId) => {
         console.log('User disconnected:', userId);
         removeUserFromList(userId);
+        closePeerConnection(userId);
     });
 
     socket.on('room-state', (state) => {
@@ -54,6 +75,36 @@ function initializeSocket() {
         updateRoomState(state);
     });
 
+    // WebRTC events
+    socket.on('offer', async ({ senderId, offer }) => {
+        console.log('Received offer from:', senderId);
+        const pc = createPeerConnection(senderId);
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('answer', {
+            targetId: senderId,
+            answer: answer
+        });
+    });
+
+    socket.on('answer', async ({ senderId, answer }) => {
+        console.log('Received answer from:', senderId);
+        const pc = peerConnections[senderId];
+        if (pc) {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        }
+    });
+
+    socket.on('ice-candidate', async ({ senderId, candidate }) => {
+        console.log('Received ICE candidate from:', senderId);
+        const pc = peerConnections[senderId];
+        if (pc) {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+    });
+
+    // Chat events
     socket.on('chat-message', (message) => {
         console.log('Chat message:', message);
         addChatMessage(message);
@@ -66,17 +117,44 @@ function initializeSocket() {
     socket.on('user-typing-stop', (userId) => {
         hideTypingIndicator(userId);
     });
+}
 
-    // Screen sharing events
-    socket.on('user-screen-share', (userId, stream) => {
-        console.log('User started screen sharing:', userId);
-        handleRemoteScreenShare(userId, stream);
-    });
+// WebRTC functions
+function createPeerConnection(targetId) {
+    if (peerConnections[targetId]) {
+        closePeerConnection(targetId);
+    }
 
-    socket.on('user-screen-share-stopped', (userId) => {
-        console.log('User stopped screen sharing:', userId);
-        stopRemoteScreenShare(userId);
-    });
+    const pc = new RTCPeerConnection(configuration);
+    peerConnections[targetId] = pc;
+
+    pc.onicecandidate = (event) => {
+        if (event.candidate) {
+            socket.emit('ice-candidate', {
+                targetId: targetId,
+                candidate: event.candidate
+            });
+        }
+    };
+
+    pc.ontrack = (event) => {
+        console.log('Received remote track');
+        const video = document.getElementById('screenVideo');
+        if (video.srcObject !== event.streams[0]) {
+            video.srcObject = event.streams[0];
+            document.getElementById('noScreenMessage').style.display = 'none';
+        }
+    };
+
+    return pc;
+}
+
+function closePeerConnection(targetId) {
+    const pc = peerConnections[targetId];
+    if (pc) {
+        pc.close();
+        delete peerConnections[targetId];
+    }
 }
 
 // Room functions
@@ -91,7 +169,7 @@ function joinRoom() {
     }
 
     console.log('Joining room:', roomId);
-    socket.emit('join-room', roomId, userId);
+    socket.emit('join-room', { roomId, userId });
     
     // Display room ID
     document.getElementById('roomIdDisplay').textContent = roomId;
@@ -101,17 +179,106 @@ function generateUserId() {
     return Math.random().toString(36).substring(2, 15);
 }
 
+// Screen sharing functions
+async function startScreenShare() {
+    try {
+        screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true
+        });
+
+        const video = document.getElementById('screenVideo');
+        video.srcObject = screenStream;
+        document.getElementById('noScreenMessage').style.display = 'none';
+        
+        // Update UI
+        document.getElementById('startScreenShare').style.display = 'none';
+        document.getElementById('stopScreenShare').style.display = 'inline-flex';
+        
+        isScreenSharing = true;
+
+        // Send stream to all connected peers
+        Object.keys(peerConnections).forEach(async (peerId) => {
+            const pc = peerConnections[peerId];
+            screenStream.getTracks().forEach(track => {
+                pc.addTrack(track, screenStream);
+            });
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('offer', {
+                targetId: peerId,
+                offer: offer
+            });
+        });
+
+        // Handle stream end
+        screenStream.getVideoTracks()[0].onended = () => {
+            stopScreenShare();
+        };
+    } catch (error) {
+        console.error('Error starting screen share:', error);
+        if (error.name === 'NotAllowedError') {
+            alert('You need to allow screen sharing to use this feature.');
+        } else {
+            alert('Failed to start screen sharing. Please try again.');
+        }
+    }
+}
+
+function stopScreenShare() {
+    if (!isScreenSharing) return;
+
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+        screenStream = null;
+    }
+
+    // Update UI
+    const video = document.getElementById('screenVideo');
+    video.srcObject = null;
+    document.getElementById('noScreenMessage').style.display = 'flex';
+    document.getElementById('startScreenShare').style.display = 'inline-flex';
+    document.getElementById('stopScreenShare').style.display = 'none';
+
+    isScreenSharing = false;
+
+    // Notify peers
+    socket.emit('screen-sharing-stopped');
+}
+
 // UI functions
+function updateConnectionStatus(connected) {
+    const status = document.getElementById('status');
+    const indicator = document.getElementById('statusIndicator');
+    
+    if (connected) {
+        status.textContent = 'Connected';
+        indicator.classList.add('connected');
+    } else {
+        status.textContent = 'Disconnected';
+        indicator.classList.remove('connected');
+    }
+}
+
 function addUserToList(user) {
     const usersList = document.getElementById('usersList');
     if (!usersList) return;
+
+    // Remove existing user if present
+    const existingUser = document.getElementById(`user-${user.id}`);
+    if (existingUser) {
+        existingUser.remove();
+    }
 
     const userElement = document.createElement('div');
     userElement.id = `user-${user.id}`;
     userElement.className = 'user-item';
     userElement.innerHTML = `
-        <img src="${user.avatar}" alt="${user.name}" class="user-avatar">
-        <span class="user-name">${user.name}</span>
+        <div class="user-avatar">${user.name[0].toUpperCase()}</div>
+        <div class="user-info">
+            <div class="user-name">${user.name}${user.id === userId ? ' (You)' : ''}</div>
+            <div class="user-role">${user.isScreenSharing ? 'Sharing screen' : 'Viewer'}</div>
+        </div>
     `;
     usersList.appendChild(userElement);
 }
@@ -132,79 +299,11 @@ function updateRoomState(state) {
     }
 
     // Update screen sharing state
-    if (state.screenSharer) {
-        handleRemoteScreenShare(state.screenSharer);
+    if (state.screenSharer && state.screenSharer !== userId) {
+        document.getElementById('startScreenShare').disabled = true;
+    } else {
+        document.getElementById('startScreenShare').disabled = false;
     }
-
-    // Update chat messages
-    const chatMessages = document.getElementById('chatMessages');
-    if (chatMessages) {
-        chatMessages.innerHTML = '';
-        state.messages.forEach(message => addChatMessage(message));
-    }
-}
-
-// Screen sharing functions
-function startScreenShare() {
-    if (isScreenSharing) return;
-
-    navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-        .then(stream => {
-            screenStream = stream;
-            isScreenSharing = true;
-            
-            // Show the video element
-            const video = document.getElementById('screenVideo');
-            video.srcObject = stream;
-            
-            // Update UI
-            document.getElementById('startScreenShare').style.display = 'none';
-            document.getElementById('stopScreenShare').style.display = 'block';
-            
-            // Notify server
-            socket.emit('screen-sharing-started', stream);
-
-            // Handle stream end
-            stream.getVideoTracks()[0].onended = () => {
-                stopScreenShare();
-            };
-        })
-        .catch(error => {
-            console.error('Error starting screen share:', error);
-            alert('Failed to start screen sharing. Please try again.');
-        });
-}
-
-function stopScreenShare() {
-    if (!isScreenSharing) return;
-
-    if (screenStream) {
-        screenStream.getTracks().forEach(track => track.stop());
-        screenStream = null;
-    }
-
-    // Update UI
-    const video = document.getElementById('screenVideo');
-    video.srcObject = null;
-    document.getElementById('startScreenShare').style.display = 'block';
-    document.getElementById('stopScreenShare').style.display = 'none';
-
-    isScreenSharing = false;
-    socket.emit('screen-sharing-stopped');
-}
-
-function handleRemoteScreenShare(userId, stream) {
-    const video = document.getElementById('screenVideo');
-    if (stream) {
-        video.srcObject = stream;
-    }
-    video.style.display = 'block';
-}
-
-function stopRemoteScreenShare() {
-    const video = document.getElementById('screenVideo');
-    video.srcObject = null;
-    video.style.display = 'none';
 }
 
 // Chat functions
@@ -219,7 +318,7 @@ function addChatMessage(message) {
             <span class="message-user">${message.userName}</span>
             <span class="message-time">${new Date(message.timestamp).toLocaleTimeString()}</span>
         </div>
-        <div class="message-content">${message.message}</div>
+        <div class="message-content">${message.text}</div>
     `;
     chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -238,9 +337,9 @@ function handleTyping() {
 
 function showTypingIndicator(userId) {
     const typingIndicator = document.getElementById('typingIndicator');
-    const user = document.querySelector(`#user-${userId} .user-name`)?.textContent;
-    if (typingIndicator && user) {
-        typingIndicator.textContent = `${user} is typing...`;
+    const userName = document.querySelector(`#user-${userId} .user-name`)?.textContent;
+    if (typingIndicator && userName) {
+        typingIndicator.textContent = `${userName} is typing...`;
         typingIndicator.style.display = 'block';
     }
 }
@@ -250,6 +349,12 @@ function hideTypingIndicator() {
     if (typingIndicator) {
         typingIndicator.style.display = 'none';
     }
+}
+
+// Mobile UI functions
+function toggleSidePanel() {
+    const sidePanel = document.getElementById('sidePanel');
+    sidePanel.classList.toggle('open');
 }
 
 // Initialize everything when the page loads
@@ -275,7 +380,10 @@ document.addEventListener('DOMContentLoaded', () => {
     sendMessage?.addEventListener('click', () => {
         const message = messageInput.value.trim();
         if (message) {
-            socket.emit('chat-message', message);
+            socket.emit('chat-message', {
+                text: message,
+                timestamp: Date.now()
+            });
             messageInput.value = '';
         }
     });
@@ -289,6 +397,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up leave room button
     document.getElementById('leaveRoom')?.addEventListener('click', () => {
-        window.location.href = '/';
+        if (confirm('Are you sure you want to leave the room?')) {
+            window.location.href = '/';
+        }
+    });
+
+    // Set up mobile panel toggle
+    document.getElementById('togglePanel')?.addEventListener('click', toggleSidePanel);
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        const sidePanel = document.getElementById('sidePanel');
+        if (window.innerWidth > 768) {
+            sidePanel.classList.remove('open');
+        }
     });
 });
