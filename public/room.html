@@ -40,14 +40,26 @@
             grid-template-rows: auto 1fr auto;
         }
         
-        #connection-status {
+        .top-bar {
             background: var(--surface-color);
             padding: 0.75rem 1.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            z-index: var(--z-index-controls);
+        }
+        
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .room-id {
+            background: var(--background-color);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-family: monospace;
         }
         
         .content-area {
@@ -67,61 +79,76 @@
             aspect-ratio: 16/9;
             background: var(--surface-color);
             border-radius: var(--border-radius);
-            object-fit: cover;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #screenVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: var(--surface-color);
         }
         
         .screen-controls {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
             gap: 1rem;
-            align-items: center;
-            padding: 1rem;
-        }
-        
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.5);
             border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: all var(--transition-speed) ease;
-        }
-        
-        .primary {
-            background: var(--primary-color);
-            color: var(--text-primary);
-        }
-        
-        .secondary {
-            background: var(--secondary-color);
-            color: var(--text-primary);
+            backdrop-filter: blur(4px);
         }
         
         .side-panel {
             position: fixed;
-            right: calc(-1 * var(--side-panel-width));
+            right: 0;
             top: 0;
             width: var(--side-panel-width);
             height: 100vh;
             background: var(--surface-color);
-            transition: right var(--transition-speed) ease;
             display: flex;
             flex-direction: column;
-            z-index: 1000;
             box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
         }
         
-        .side-panel.open {
-            right: 0;
+        .panel-header {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
         
         .users-list {
+            flex: 0 0 auto;
             padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 30vh;
+            overflow-y: auto;
+        }
+        
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 0.5rem;
+            background: var(--background-color);
+        }
+        
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary-color);
         }
         
         .chat-container {
             flex: 1;
             display: flex;
             flex-direction: column;
+            min-height: 0;
         }
         
         .chat-messages {
@@ -130,9 +157,32 @@
             padding: 1rem;
         }
         
+        .chat-message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            background: var(--background-color);
+            max-width: 80%;
+        }
+        
+        .chat-message.own-message {
+            margin-left: auto;
+            background: var(--primary-color);
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+            color: var(--text-secondary);
+        }
+        
         .typing-indicator {
             padding: 0.5rem 1rem;
-            background: var(--background-color);
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            display: none;
         }
         
         .chat-input {
@@ -152,64 +202,82 @@
             font-size: 1rem;
         }
         
-        .room-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            background: var(--primary-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            font-size: 1rem;
         }
         
-        .room-id {
+        .btn:hover {
+            background: var(--secondary-color);
+        }
+        
+        .btn.secondary {
+            background: var(--surface-color);
+        }
+        
+        .btn.secondary:hover {
             background: var(--background-color);
-            padding: 0.5rem 1rem;
-            border-radius: var(--border-radius);
-            font-family: monospace;
-            color: var(--text-secondary);
+        }
+        
+        .btn.danger {
+            background: var(--danger-color);
         }
     </style>
 </head>
 <body>
     <div class="room-container">
-        <div id="connection-status">
-            Status: <span id="status">Connecting...</span>
+        <div class="top-bar">
+            <div class="room-info">
+                <div id="status">Connecting...</div>
+                <div class="room-id">
+                    <span id="roomIdDisplay"></span>
+                    <button class="btn secondary" id="copyRoomId">Copy</button>
+                </div>
+            </div>
+            <button class="btn danger" id="leaveRoom">Leave Room</button>
         </div>
 
         <div class="content-area">
-            <!-- Screen sharing area -->
             <div class="screen-share-container">
                 <video id="screenVideo" autoplay playsinline></video>
                 <div class="screen-controls">
-                    <button id="startScreenShare" class="btn primary">Share Screen</button>
+                    <button id="startScreenShare" class="btn">Share Screen</button>
                     <button id="stopScreenShare" class="btn secondary" style="display: none;">Stop Sharing</button>
-                </div>
-            </div>
-
-            <!-- Chat and users area -->
-            <div class="side-panel">
-                <!-- Users list -->
-                <div class="users-list">
-                    <h3>Users in Room</h3>
-                    <div id="usersList"></div>
-                </div>
-
-                <!-- Chat area -->
-                <div class="chat-container">
-                    <div class="chat-messages" id="chatMessages"></div>
-                    <div class="typing-indicator" id="typingIndicator"></div>
-                    <div class="chat-input">
-                        <input type="text" id="messageInput" placeholder="Type a message...">
-                        <button id="sendMessage" class="btn primary">Send</button>
-                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="room-info">
-            <div class="room-id">
-                Room ID: <span id="roomIdDisplay"></span>
-                <button id="copyRoomId" class="btn secondary">Copy</button>
+        <div class="side-panel">
+            <div class="panel-header">
+                <h3>Room Participants</h3>
             </div>
-            <button id="leaveRoom" class="btn primary">Leave Room</button>
+            
+            <div class="users-list" id="usersList">
+                <!-- Users will be added here dynamically -->
+            </div>
+
+            <div class="chat-container">
+                <div class="panel-header">
+                    <h3>Chat</h3>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Chat messages will be added here dynamically -->
+                </div>
+                
+                <div class="typing-indicator" id="typingIndicator"></div>
+                
+                <div class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Type a message...">
+                    <button id="sendMessage" class="btn">Send</button>
+                </div>
+            </div>
         </div>
     </div>
 
