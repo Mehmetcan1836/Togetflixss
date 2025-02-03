@@ -13,7 +13,14 @@
   "routes": [
     {
       "src": "/socket.io/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        "Access-Control-Allow-Credentials": "true"
+      },
+      "continue": true
     },
     {
       "src": "/public/(.*)",
@@ -23,15 +30,65 @@
       }
     },
     {
-      "handle": "filesystem"
+      "src": "/(.*\\.(js|css|svg|png|jpg|jpeg|gif|ico|json))",
+      "dest": "/public/$1",
+      "headers": {
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/styles.css",
+      "dest": "/public/styles.css",
+      "headers": {
+        "content-type": "text/css",
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/app.js",
+      "dest": "/public/app.js",
+      "headers": {
+        "content-type": "application/javascript",
+        "cache-control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/room.js",
+      "dest": "/public/room.js",
+      "headers": {
+        "content-type": "application/javascript",
+        "cache-control": "public, max-age=31536000, immutable"
+      }
     },
     {
       "src": "/api/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        "Access-Control-Allow-Credentials": "true"
+      }
+    },
+    {
+      "src": "/room/(.*)",
+      "dest": "/server.js"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+        "Access-Control-Allow-Credentials": "true"
+      }
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
