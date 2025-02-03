@@ -4,15 +4,23 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST"],
+        allowedHeaders: ["Content-Type"]
     },
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    path: '/socket.io/'
 });
 const path = require('path');
 
 // Middleware
 app.use(express.static('public'));
 app.use(express.json());
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+});
 
 // Store room and user information
 const rooms = new Map();
@@ -217,3 +225,6 @@ const port = process.env.PORT || 3000;
 http.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
+
+// Export the server for serverless deployment
+module.exports = http;
