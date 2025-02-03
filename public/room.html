@@ -23,11 +23,19 @@
     <!-- Critical inline CSS -->
     <style>
         :root {
+            --primary-color: #2563eb;
+            --secondary-color: #3b82f6;
+            --background-color: #0f172a;
+            --surface-color: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --danger-color: #ef4444;
+            --success-color: #22c55e;
             --top-bar-height: 60px;
             --controls-bar-height: 70px;
-            --side-panel-width: 300px;
-            --background-color: #1a1a1a;
-            --z-index-controls: 1000;
+            --side-panel-width: 320px;
+            --border-radius: 12px;
+            --transition-speed: 0.3s;
         }
         
         body {
@@ -35,219 +43,331 @@
             padding: 0;
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--background-color);
-            color: white;
+            color: var(--text-primary);
             overflow: hidden;
+            line-height: 1.5;
         }
         
         .room-container {
             width: 100vw;
             height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
         }
         
-        /* Add hover animations */
+        /* Top Bar Styles */
+        .top-bar {
+            background: var(--surface-color);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: var(--z-index-controls);
+        }
+        
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .room-title {
+            font-size: 1.5rem;
+            margin: 0;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .room-id {
+            background: var(--background-color);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-family: monospace;
+            color: var(--text-secondary);
+        }
+        
+        /* Main Content Styles */
+        .main-content {
+            position: relative;
+            display: grid;
+            place-items: center;
+            background: var(--background-color);
+            padding: 1rem;
+            gap: 1rem;
+            overflow: hidden;
+        }
+        
+        .local-video, .screen-share {
+            width: 100%;
+            max-width: 1200px;
+            height: auto;
+            aspect-ratio: 16/9;
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            object-fit: cover;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Controls Bar Styles */
+        .controls-bar {
+            background: var(--surface-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .controls-group {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
         .control-btn {
-            transition: transform 0.2s ease-in-out;
+            background: var(--background-color);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
         }
         
         .control-btn:hover {
-            transform: scale(1.1);
+            transform: translateY(-2px);
+            background: var(--primary-color);
         }
         
-        .tooltip {
-            position: relative;
+        .control-btn i {
+            font-size: 1.25rem;
         }
         
-        .reaction-btn:hover {
-            transform: scale(1.2);
-            transition: 0.2s ease-in-out;
+        .leave-btn {
+            background: var(--danger-color);
         }
         
-        .share-btn:hover {
-            transform: scale(1.1);
-            transition: 0.2s ease-in-out;
+        .leave-btn:hover {
+            background: #dc2626;
         }
         
-        .tooltip::before {
-            content: attr(data-tooltip);
-            position: absolute;
-            background-color: #333;
-            color: #fff;
-            padding: 10px;
-            border-radius: 5px;
-            visibility: hidden;
-            opacity: 0;
-            transition: 0.2s ease-in-out;
+        /* Side Panel Styles */
+        .side-panel {
+            position: fixed;
+            right: calc(-1 * var(--side-panel-width));
+            top: 0;
+            width: var(--side-panel-width);
+            height: 100vh;
+            background: var(--surface-color);
+            transition: right var(--transition-speed) ease;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            box-shadow: -2px 0 8px rgba(0, 0, 0, 0.2);
         }
         
-        .tooltip:hover::before {
-            visibility: visible;
-            opacity: 1;
+        .side-panel.open {
+            right: 0;
         }
         
         .panel-tabs {
             display: flex;
-            background: #2a2a2a;
-            border-bottom: 1px solid #3a3a3a;
+            background: var(--background-color);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
-
+        
         .tab-btn {
             flex: 1;
-            padding: 15px;
+            padding: 1rem;
             border: none;
             background: none;
-            color: #fff;
+            color: var(--text-secondary);
             cursor: pointer;
-            transition: background-color 0.3s;
+            transition: all var(--transition-speed) ease;
+            font-weight: 500;
         }
-
-        .tab-btn:hover {
-            background: #3a3a3a;
-        }
-
+        
         .tab-btn.active {
-            background: #3a3a3a;
-            border-bottom: 2px solid #4CAF50;
+            color: var(--text-primary);
+            background: var(--primary-color);
         }
-
+        
         .panel-content {
+            flex: 1;
             display: none;
-            height: calc(100% - 51px);
-        }
-
-        .panel-content.active {
-            display: flex;
             flex-direction: column;
         }
-
-        .users-list {
+        
+        .panel-content.active {
+            display: flex;
+        }
+        
+        /* Chat Styles */
+        .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 10px;
+            padding: 1rem;
         }
-
+        
+        .chat-input-container {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: var(--background-color);
+        }
+        
+        #chat-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: var(--border-radius);
+            background: var(--surface-color);
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        
+        /* Users Panel Styles */
+        .users-list {
+            padding: 1rem;
+        }
+        
         .user-item {
             display: flex;
             align-items: center;
-            padding: 10px;
-            margin-bottom: 5px;
-            background: #2a2a2a;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            background: var(--background-color);
+            margin-bottom: 0.5rem;
         }
-
-        .user-item:hover {
-            background: #3a3a3a;
-        }
-
-        .user-item.moderator {
-            border-left: 3px solid #4CAF50;
-        }
-
-        .user-item.selected {
-            background: #3a3a3a;
-            border: 1px solid #4CAF50;
-        }
-
+        
         .user-avatar {
-            width: 32px;
-            height: 32px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            background: #4a4a4a;
-            margin-right: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: var(--primary-color);
+            display: grid;
+            place-items: center;
         }
-
-        .user-info {
-            flex: 1;
-        }
-
+        
         .user-name {
-            font-weight: bold;
+            font-weight: 500;
         }
-
-        .user-role {
-            font-size: 0.8em;
-            color: #888;
+        
+        .user-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success-color);
         }
-
-        .user-actions {
-            padding: 10px;
-            background: #2a2a2a;
-            border-top: 1px solid #3a3a3a;
-            display: none;
-        }
-
-        .user-actions.visible {
-            display: flex;
-            gap: 10px;
-        }
-
-        .action-btn {
-            flex: 1;
-            padding: 8px;
-            border: none;
-            border-radius: 5px;
-            background: #3a3a3a;
-            color: #fff;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        .action-btn:hover {
-            background: #4a4a4a;
-        }
-
-        .action-btn i {
-            margin-right: 5px;
-        }
-
-        .side-panel {
-            position: fixed;
-            right: -400px;
-            top: 0;
-            width: 400px;
-            height: 100vh;
-            background: #1a1a1a;
-            transition: right 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            z-index: 1000;
-        }
-
-        .side-panel.open {
-            right: 0;
-        }
-
+        
+        /* Chat Toggle Button */
         .chat-toggle {
             position: fixed;
             right: 20px;
             bottom: 20px;
             z-index: 1001;
-            width: 60px;
-            height: 60px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             background: var(--primary-color);
             border: none;
             color: white;
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s ease;
+            transition: all var(--transition-speed) ease;
+            display: grid;
+            place-items: center;
         }
-
+        
         .chat-toggle:hover {
             transform: scale(1.1);
+            background: var(--secondary-color);
         }
-
+        
         .chat-toggle i {
-            font-size: 24px;
+            font-size: 1.5rem;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .side-panel {
+                width: 100%;
+                right: -100%;
+            }
+            
+            .controls-bar {
+                padding: 1rem;
+            }
+            
+            .control-btn {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .room-title {
+                font-size: 1.25rem;
+            }
+            
+            .room-id {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .controls-group {
+                gap: 0.5rem;
+            }
+            
+            .control-btn {
+                width: 36px;
+                height: 36px;
+            }
+            
+            .control-btn i {
+                font-size: 1rem;
+            }
+        }
+        
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+        
+        .tooltip {
+            position: relative;
+        }
+        
+        .tooltip::before {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1rem;
+            background: var(--surface-color);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            border-radius: var(--border-radius);
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-speed) ease;
+        }
+        
+        .tooltip:hover::before {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(-8px);
         }
     </style>
     
     <!-- Load scripts -->
-    <script src="/socket.io/socket.io.js" defer></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" defer></script>
     <script src="https://webrtc.github.io/adapter/adapter-latest.js" defer></script>
     <script src="/js/room.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
@@ -261,7 +381,7 @@
                 <span id="room-id" class="room-id"></span>
             </div>
             <div class="top-controls">
-                <button id="top-share-button" class="control-btn tooltip" data-action="share-room" data-tooltip="Odayı Paylaş">
+                <button id="share-button" class="control-btn tooltip" data-action="share-room" data-tooltip="Odayı Paylaş">
                     <i class="fas fa-share-alt"></i>
                 </button>
             </div>
@@ -277,35 +397,24 @@
 
         <!-- Controls Bar -->
         <div id="controls-bar" class="controls-bar">
-            <div class="left-controls">
-                <button id="bottom-share-button" class="control-btn tooltip" data-action="share-room" data-tooltip="Odayı Paylaş">
-                    <i class="fas fa-share-alt"></i>
+            <div class="controls-group">
+                <button class="control-btn tooltip" data-action="toggle-camera" data-tooltip="Kamerayı Aç/Kapat">
+                    <i class="fas fa-video"></i>
                 </button>
-            </div>
-            
-            <div class="center-controls">
-                <div class="controls-group">
-                    <button class="control-btn tooltip" data-action="toggle-camera" data-tooltip="Kamerayı Aç/Kapat">
-                        <i class="fas fa-video"></i>
-                    </button>
-                    <button class="control-btn tooltip" data-action="toggle-mic" data-tooltip="Mikrofonu Aç/Kapat">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="control-btn tooltip" data-action="toggle-screen" data-tooltip="Ekran Paylaş">
-                        <i class="fas fa-desktop"></i>
-                    </button>
-                    <button class="control-btn leave-btn tooltip" data-action="leave-room" data-tooltip="Odadan Ayrıl">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="right-controls">
+                <button class="control-btn tooltip" data-action="toggle-mic" data-tooltip="Mikrofonu Aç/Kapat">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button class="control-btn tooltip" data-action="toggle-screen" data-tooltip="Ekran Paylaş">
+                    <i class="fas fa-desktop"></i>
+                </button>
+                <button class="control-btn leave-btn tooltip" data-action="leave-room" data-tooltip="Odadan Ayrıl">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
             </div>
         </div>
 
         <!-- Chat toggle button -->
-        <button class="chat-toggle" data-action="toggle-chat">
+        <button class="chat-toggle tooltip" data-action="toggle-chat" data-tooltip="Sohbeti Aç/Kapat">
             <i class="fas fa-comments"></i>
         </button>
 
@@ -336,14 +445,6 @@
             <div id="users-panel" class="panel-content" data-panel="users">
                 <div class="users-list" id="users-list">
                     <!-- Users will be added here dynamically -->
-                </div>
-                <div id="user-actions" class="user-actions hidden">
-                    <button class="action-btn" data-action="make-moderator">
-                        <i class="fas fa-crown"></i> Moderatör Yap
-                    </button>
-                    <button class="action-btn" data-action="remove-user">
-                        <i class="fas fa-user-minus"></i> Kullanıcıyı Çıkar
-                    </button>
                 </div>
             </div>
         </div>
