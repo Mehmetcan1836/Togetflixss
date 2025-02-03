@@ -2,13 +2,19 @@ const express = require('express');
 const app = express();
 const server = require('http').Server(app);
 const io = require('socket.io')(server, {
+    path: '/socket.io/',
+    serveClient: true,
     cors: {
         origin: "*",
-        methods: ["GET", "POST", "OPTIONS"],
-        allowedHeaders: ["*"],
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allowedHeaders: ["X-Requested-With", "Content-Type", "Accept"],
         credentials: true
     },
-    transports: ['polling', 'websocket']
+    transports: ['polling', 'websocket'],
+    pingInterval: 10000,
+    pingTimeout: 5000,
+    upgradeTimeout: 30000,
+    allowUpgrades: true
 });
 
 const path = require('path');
@@ -24,8 +30,10 @@ app.use(express.json());
 // CORS middleware
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
     if (req.method === 'OPTIONS') {
         res.sendStatus(200);
     } else {
@@ -38,15 +46,26 @@ function generateRoomId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+// Generate random username
+function generateUsername() {
+    const adjectives = ['Happy', 'Lucky', 'Sunny', 'Clever', 'Swift', 'Bright', 'Cool', 'Smart'];
+    const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Lion', 'Fox', 'Wolf', 'Bear'];
+    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}`;
+}
+
 // API Routes
 app.post('/api/rooms', (req, res) => {
     try {
         const roomId = generateRoomId();
-        rooms.set(roomId, {
+        const room = {
+            id: roomId,
             users: new Set(),
             screenSharer: null,
+            messages: [],
             createdAt: Date.now()
-        });
+        };
+        rooms.set(roomId, room);
+        console.log('Room created:', roomId);
         res.json({ roomId, created: true });
     } catch (error) {
         console.error('Error creating room:', error);
@@ -62,7 +81,12 @@ app.get('/api/rooms/:roomId', (req, res) => {
             const roomUsers = Array.from(room.users)
                 .map(userId => users.get(userId))
                 .filter(Boolean);
-            res.json({ exists: true, users: roomUsers });
+            res.json({ 
+                exists: true, 
+                users: roomUsers,
+                screenSharer: room.screenSharer,
+                messages: room.messages
+            });
         } else {
             res.status(404).json({ exists: false });
         }
@@ -72,20 +96,46 @@ app.get('/api/rooms/:roomId', (req, res) => {
     }
 });
 
+// Routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/room/:roomId', (req, res) => {
+    const { roomId } = req.params;
+    const room = rooms.get(roomId);
+    
+    // Create room if it doesn't exist
+    if (!room) {
+        rooms.set(roomId, {
+            id: roomId,
+            users: new Set(),
+            screenSharer: null,
+            messages: [],
+            createdAt: Date.now()
+        });
+    }
+    
+    res.sendFile(path.join(__dirname, 'public', 'room.html'));
+});
+
 // Socket connection handling
 io.on('connection', socket => {
     console.log('User connected:', socket.id);
 
     socket.on('join-room', (roomId, userId) => {
         try {
+            console.log('User joining room:', { roomId, userId });
+            
             // Create user if doesn't exist
             if (!users.has(userId)) {
                 users.set(userId, {
                     id: userId,
                     socketId: socket.id,
-                    name: `User ${Math.random().toString(36).substring(2, 6)}`,
+                    name: generateUsername(),
                     avatar: `https://api.dicebear.com/6.x/adventurer/svg?seed=${userId}`,
-                    roomId: roomId
+                    roomId: roomId,
+                    joinedAt: Date.now()
                 });
             }
 
@@ -94,12 +144,14 @@ io.on('connection', socket => {
             // Initialize room if doesn't exist
             if (!rooms.has(roomId)) {
                 rooms.set(roomId, {
+                    id: roomId,
                     users: new Set(),
-                    screenSharer: null
+                    screenSharer: null,
+                    messages: [],
+                    createdAt: Date.now()
                 });
             }
 
-            // Add user to room
             const room = rooms.get(roomId);
             room.users.add(userId);
             socket.join(roomId);
@@ -107,15 +159,20 @@ io.on('connection', socket => {
             // Broadcast to others in room
             socket.to(roomId).emit('user-connected', user);
 
-            // Send current users in room to the new user
+            // Send current room state to the new user
             const roomUsers = Array.from(room.users)
                 .map(id => users.get(id))
                 .filter(Boolean);
 
-            socket.emit('room-users', roomUsers);
+            socket.emit('room-state', {
+                users: roomUsers,
+                screenSharer: room.screenSharer,
+                messages: room.messages
+            });
 
             // Handle screen sharing
             socket.on('screen-sharing-started', stream => {
+                console.log('Screen sharing started:', userId);
                 if (room) {
                     room.screenSharer = userId;
                     socket.to(roomId).emit('user-screen-share', userId, stream);
@@ -123,10 +180,34 @@ io.on('connection', socket => {
             });
 
             socket.on('screen-sharing-stopped', () => {
+                console.log('Screen sharing stopped:', userId);
                 if (room && room.screenSharer === userId) {
                     room.screenSharer = null;
                     socket.to(roomId).emit('user-screen-share-stopped', userId);
                 }
+            });
+
+            // Handle chat messages
+            socket.on('chat-message', message => {
+                console.log('Chat message:', message);
+                const messageObj = {
+                    id: Date.now(),
+                    userId,
+                    userName: user.name,
+                    message,
+                    timestamp: Date.now()
+                };
+                room.messages.push(messageObj);
+                io.to(roomId).emit('chat-message', messageObj);
+            });
+
+            // Handle user typing
+            socket.on('typing-start', () => {
+                socket.to(roomId).emit('user-typing', userId);
+            });
+
+            socket.on('typing-stop', () => {
+                socket.to(roomId).emit('user-typing-stop', userId);
             });
 
         } catch (error) {
@@ -137,12 +218,20 @@ io.on('connection', socket => {
 
     socket.on('disconnect', () => {
         try {
+            console.log('User disconnected:', socket.id);
             // Find and remove user from their room
             for (const [roomId, room] of rooms.entries()) {
                 for (const userId of room.users) {
                     const user = users.get(userId);
                     if (user && user.socketId === socket.id) {
                         room.users.delete(userId);
+                        
+                        // Clear screen sharer if disconnected user was sharing
+                        if (room.screenSharer === userId) {
+                            room.screenSharer = null;
+                            io.to(roomId).emit('user-screen-share-stopped', userId);
+                        }
+                        
                         io.to(roomId).emit('user-disconnected', userId);
                         users.delete(userId);
                         
@@ -160,13 +249,10 @@ io.on('connection', socket => {
     });
 });
 
-// Routes
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-app.get('/room/:room', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'room.html'));
+// Error handling
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).json({ error: 'Internal server error' });
 });
 
 const port = process.env.PORT || 3000;

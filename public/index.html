@@ -121,25 +121,47 @@
             color: var(--primary-color);
             margin-bottom: 15px;
         }
+        
+        #connection-status {
+            margin-top: 20px;
+        }
+        
+        #connection-status span {
+            color: var(--primary-color);
+        }
     </style>
 </head>
 <body>
     <div class="home-container">
-        <h1 class="logo">Watch Share</h1>
-        
-        <div class="action-buttons">
-            <button id="create-room" class="btn">
-                <i class="fas fa-plus"></i> Yeni Oda Oluştur
-            </button>
-        </div>
-        
-        <div class="join-form">
-            <input type="text" id="room-id" class="room-input" placeholder="Oda ID" maxlength="6">
-            <button id="join-room" class="btn btn-secondary" disabled>
-                <i class="fas fa-sign-in-alt"></i> Odaya Katıl
-            </button>
-        </div>
-        
+        <header>
+            <h1 class="logo">Watch Share</h1>
+            <p>Ekranınızı paylaşın ve gerçek zamanlı sohbet edin</p>
+            <div id="connection-status">
+                Status: <span id="status">Connecting...</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="room-controls">
+                <div class="create-room">
+                    <h2>Yeni Oda Oluştur</h2>
+                    <button id="create-room" class="btn primary">
+                        <i class="fas fa-plus"></i> Yeni Oda Oluştur
+                    </button>
+                </div>
+
+                <div class="join-room">
+                    <h2>Mevcut Odaya Katıl</h2>
+                    <div class="input-group">
+                        <input type="text" id="room-id" class="room-input" placeholder="Oda ID" maxlength="6">
+                        <button id="join-room" class="btn secondary" disabled>
+                            <i class="fas fa-sign-in-alt"></i> Odaya Katıl
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
         <div class="features">
             <h2>Özellikler</h2>
             <div class="feature-list">
@@ -160,6 +182,10 @@
                 </div>
             </div>
         </div>
+        
+        <footer>
+            <p>&copy; 2024 Watch Share. All rights reserved.</p>
+        </footer>
     </div>
     
     <!-- Scripts -->
