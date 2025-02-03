@@ -4,7 +4,17 @@ const socket = io(window.location.origin, {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    path: '/socket.io/'
+    path: '/socket.io/',
+    timeout: 20000
+});
+
+// Handle socket connection events
+socket.on('connect', () => {
+    console.log('Socket connected successfully');
+});
+
+socket.on('connect_error', (error) => {
+    console.error('Socket connection error:', error);
 });
 
 // Initialize room functionality
@@ -53,13 +63,18 @@ document.addEventListener('DOMContentLoaded', () => {
 async function createRoom() {
     try {
         console.log('Creating room...');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
         const response = await fetch('/api/rooms', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
         console.log('Response:', response);
         
         if (!response.ok) {
@@ -76,7 +91,11 @@ async function createRoom() {
         }
     } catch (error) {
         console.error('Error creating room:', error);
-        alert('Oda oluşturulurken bir hata oluştu.');
+        if (error.name === 'AbortError') {
+            alert('Oda oluşturma zaman aşımına uğradı. Lütfen tekrar deneyin.');
+        } else {
+            alert('Oda oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.');
+        }
     }
 }
 
