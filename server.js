@@ -101,12 +101,17 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Handle room routes
 app.get('/room/:roomId', (req, res) => {
     const { roomId } = req.params;
-    const room = rooms.get(roomId);
+    
+    // Validate room ID format
+    if (!/^[A-Z0-9]{6}$/.test(roomId)) {
+        return res.redirect('/');
+    }
     
     // Create room if it doesn't exist
-    if (!room) {
+    if (!rooms.has(roomId)) {
         rooms.set(roomId, {
             id: roomId,
             users: new Set(),

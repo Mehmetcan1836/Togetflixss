@@ -53,6 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const joinRoomBtn = document.getElementById('joinRoom');
     const roomInput = document.getElementById('roomInput');
 
+    // Enable/disable join button based on input
+    roomInput?.addEventListener('input', (e) => {
+        const value = e.target.value.trim();
+        if (joinRoomBtn) {
+            joinRoomBtn.disabled = value.length === 0;
+        }
+    });
+
     createRoomBtn?.addEventListener('click', async () => {
         console.log('Create room clicked');
         try {
@@ -103,18 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Handle room input
-    roomInput?.addEventListener('input', (e) => {
-        const value = e.target.value.trim().toUpperCase();
-        e.target.value = value;
-        if (joinRoomBtn) {
-            joinRoomBtn.disabled = !value;
-        }
-    });
-
+    // Handle enter key in room input
     roomInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && roomInput.value.trim()) {
-            e.preventDefault();
+        if (e.key === 'Enter' && !joinRoomBtn.disabled) {
             joinRoomBtn.click();
         }
     });
