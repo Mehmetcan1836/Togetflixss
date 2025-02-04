@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Togetflix - Oda</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/room.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body class="room-page">
+    <div class="room-container">
+        <!-- Sol Panel -->
+        <div class="left-panel">
+            <!-- Video Bölümü -->
+            <div class="video-container">
+                <div id="player"></div>
+                <video id="screenShareVideo" autoplay playsinline></video>
+                <div id="videoOverlay" class="video-overlay">
+                    <i class="fas fa-play"></i>
+                    <p>Video yüklemek için tıklayın</p>
+                </div>
+            </div>
+
+            <!-- Medya Kontrolleri -->
+            <div class="media-controls">
+                <button id="toggleCameraBtn" title="Kamera"><i class="fas fa-video"></i></button>
+                <button id="toggleMicBtn" title="Mikrofon"><i class="fas fa-microphone"></i></button>
+                <button id="screenShareBtn" title="Ekran Paylaşımı"><i class="fas fa-desktop"></i></button>
+                <button id="settingsBtn" title="Ayarlar"><i class="fas fa-cog"></i></button>
+            </div>
+        </div>
+
+        <!-- Sağ Panel -->
+        <div class="right-panel">
+            <!-- Oda Bilgileri -->
+            <div class="room-info">
+                <h2>Oda: <span id="roomId"></span></h2>
+                <div class="room-actions">
+                    <button id="copyRoomLink"><i class="fas fa-link"></i> Bağlantıyı Kopyala</button>
+                    <button id="leaveRoomBtn" class="danger"><i class="fas fa-sign-out-alt"></i> Odadan Ayrıl</button>
+                </div>
+            </div>
+
+            <!-- Kullanıcı Listesi -->
+            <div class="users-list">
+                <h3>Katılımcılar <span id="participantCount">0</span></h3>
+                <div id="usersList">
+                    <!-- Kullanıcılar dinamik olarak eklenecek -->
+                </div>
+            </div>
+
+            <!-- Sohbet Bölümü -->
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Mesajlar dinamik olarak eklenecek -->
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Mesajınızı yazın...">
+                    <button id="sendMessageBtn"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+
+            <!-- Emoji Reaksiyonları -->
+            <div class="reactions-container">
+                <button class="reaction-btn" data-emoji="👍">👍</button>
+                <button class="reaction-btn" data-emoji="👎">👎</button>
+                <button class="reaction-btn" data-emoji="😂">😂</button>
+                <button class="reaction-btn" data-emoji="😮">😮</button>
+                <button class="reaction-btn" data-emoji="❤️">❤️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Search Modal -->
+    <div class="modal-overlay" id="videoModalOverlay"></div>
+    <div class="video-search-modal" id="videoSearchModal">
+        <div class="modal-header">
+            <h3>Video Ara</h3>
+            <button class="close-modal" id="closeVideoModal">&times;</button>
+        </div>
+        <div class="search-container">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" class="search-input" id="videoSearchInput" placeholder="YouTube video ara...">
+        </div>
+        <div class="video-results" id="videoResults"></div>
+    </div>
+
+    <!-- Ayarlar Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Ayarlar</h3>
+                <button id="closeSettingsModal" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h4>Video Ayarları</h4>
+                    <select id="cameraSelect">
+                        <option value="">Kamera seçin...</option>
+                    </select>
+                    <select id="microphoneSelect">
+                        <option value="">Mikrofon seçin...</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bildirimler -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <!-- Scripts -->
+    <script src="/js/utils.js"></script>
+    <script src="/js/room.js"></script>
+</body>
+</html>
