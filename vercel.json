@@ -13,47 +13,19 @@
   "routes": [
     {
       "src": "/socket.io/(.*)",
-      "dest": "server.js",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": "X-Requested-With,content-type, Authorization",
-        "Access-Control-Allow-Credentials": "true"
-      }
-    }
-  ],
-  "headers": [
-    {
-      "source": "/socket.io/(.*)",
-      "headers": [
-        {
-          "key": "Upgrade",
-          "value": "websocket"
-        },
-        {
-          "key": "Connection",
-          "value": "Upgrade"
-        }
-      ]
+      "dest": "server.js"
     },
     {
       "src": "/api/(.*)",
       "dest": "server.js"
     },
     {
-      "src": "/room",
-      "dest": "/public/room.html"
-    },
-    {
       "src": "/room/(.*)",
-      "dest": "/public/room.html"
+      "dest": "server.js"
     },
     {
       "src": "/(.*)",
       "dest": "/public/$1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }

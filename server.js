@@ -3,9 +3,8 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: ["https://togetflix-mehmetcan1836s-projects.vercel.app", "http://localhost:3000"],
+        origin: "*",
         methods: ["GET", "POST"],
-        allowedHeaders: ["my-custom-header"],
         credentials: true
     },
     path: '/socket.io/',
@@ -13,11 +12,7 @@ const io = require('socket.io')(http, {
     serveClient: true,
     pingTimeout: 60000,
     pingInterval: 25000,
-    upgradeTimeout: 30000,
-    maxHttpBufferSize: 1e8,
-    transports: ['websocket', 'polling'],
-    connectTimeout: 45000,
-    cleanupEmptyChildNamespaces: true
+    transports: ['websocket', 'polling']
 });
 
 const path = require('path');

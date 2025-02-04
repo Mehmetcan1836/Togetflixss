@@ -20,31 +20,22 @@ function initializeSocket() {
     socket = io(window.location.origin, {
         path: '/socket.io/',
         transports: ['polling', 'websocket'],
-        forceNew: true,
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 30000,
-        withCredentials: false,
-        extraHeaders: {
-            'Access-Control-Allow-Origin': '*'
-        }
+        timeout: 20000
     });
 
     socket.on('connect', () => {
         console.log('Connected to server with ID:', socket.id);
         updateConnectionStatus(true);
+        joinRoom(); // Automatically join room after connection
     });
 
     socket.on('connect_error', (error) => {
         console.error('Socket connection error:', error);
         updateConnectionStatus(false);
-        
-        // Daha detaylı hata yönetimi
         setTimeout(() => {
-            console.log('Attempting to reconnect with different strategy...');
-            socket.io.opts.transports = ['polling', 'websocket'];
             socket.connect();
         }, 2000);
     });
