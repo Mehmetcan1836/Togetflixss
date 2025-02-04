@@ -17,47 +17,43 @@ const configuration = {
 
 // Initialize socket connection
 function initializeSocket() {
-    socket = io(window.location.origin, {
-        path: '/socket.io',  // Remove trailing slash
+    const socketOptions = {
+        path: '/socket.io',
         transports: ['polling', 'websocket'],
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 3,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        timeout: 60000,
-        autoConnect: true,
-        forceNew: true,
-        query: {
-            roomId: window.location.pathname.split('/').pop()
-        }
+        timeout: 20000,
+        autoConnect: false
+    };
+
+    socket = io(window.location.origin, socketOptions);
+
+    socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        document.getElementById('status').textContent = 'Connection Error';
+        document.getElementById('status').style.color = 'red';
     });
 
     socket.on('connect', () => {
         console.log('Connected to server with ID:', socket.id);
-        updateConnectionStatus(true);
-        joinRoom(); // Automatically join room after connection
-    });
-
-    socket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-        updateConnectionStatus(false);
-        setTimeout(() => {
-            socket.connect();
-        }, 2000);
+        document.getElementById('status').textContent = 'Connected';
+        document.getElementById('status').style.color = 'green';
+        
+        // Join room after successful connection
+        const roomId = window.location.pathname.split('/').pop();
+        socket.emit('join-room', roomId, socket.id);
     });
 
     socket.on('disconnect', (reason) => {
         console.log('Disconnected:', reason);
-        updateConnectionStatus(false);
-        
-        if (reason === 'io server disconnect') {
-            // Sunucu tarafından bağlantı kesildi, yeniden bağlanmayı dene
-            setTimeout(() => {
-                socket.connect();
-            }, 1000);
-        }
-        // Diğer disconnect sebepleri için socket.io otomatik olarak yeniden bağlanmayı deneyecek
+        document.getElementById('status').textContent = 'Disconnected';
+        document.getElementById('status').style.color = 'red';
     });
+
+    // Start the connection
+    socket.connect();
 
     // Room events
     socket.on('user-connected', async (user) => {
