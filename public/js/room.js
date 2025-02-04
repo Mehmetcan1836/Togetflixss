@@ -5,211 +5,202 @@ let currentRoom = null;
 let isTyping = false;
 let typingTimeout = null;
 
-// Initialize socket connection
-function initializeSocket() {
-    const roomId = getRoomIdFromUrl();
-    if (!roomId) {
-        showError('Invalid room ID');
-        return;
-    }
+// Socket.IO bağlantısı
+const socket = io(window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000'
+    : 'https://togetflix-mehmetcan1836s-projects.vercel.app');
 
-    const socketUrl = window.location.hostname === 'localhost' 
-        ? 'http://localhost:3000'
-        : 'https://togetflix-mehmetcan1836s-projects.vercel.app';
+// DOM elementleri
+const chatMessages = document.getElementById('chatMessages');
+const messageInput = document.getElementById('messageInput');
+const videoOverlay = document.getElementById('videoOverlay');
+const roomIdSpan = document.querySelector('.room-id');
+const userCountSpan = document.querySelector('.user-count span');
+const typingIndicator = document.querySelector('.typing-indicator');
+const sendBtn = document.querySelector('.send-btn');
+const shareScreenBtn = document.querySelector('.share-screen-btn');
+const copyBtn = document.querySelector('.copy-btn');
+const leaveBtn = document.querySelector('.leave-btn');
 
-    const socketOptions = {
-        path: '/socket.io/',
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000,
-        autoConnect: true
-    };
+// Oda ID'sini URL'den al
+const roomId = window.location.pathname.split('/').pop();
+roomIdSpan.textContent = `Room ID: ${roomId}`;
 
-    try {
-        socket = io(socketUrl, socketOptions);
+// Kullanıcı adını localStorage'dan al veya oluştur
+let username = localStorage.getItem('username');
+if (!username) {
+    username = 'User_' + Math.random().toString(36).substr(2, 6);
+    localStorage.setItem('username', username);
+}
 
-        socket.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
-            showError('Connection error. Retrying...');
-            updateConnectionStatus(false);
+// Odaya katıl
+socket.emit('joinRoom', { roomId, username });
+
+// Bağlantı durumu
+socket.on('connect', () => {
+    showNotification('Connected to server', 'success');
+});
+
+socket.on('disconnect', () => {
+    showNotification('Disconnected from server', 'error');
+});
+
+// Kullanıcı sayısını güncelle
+socket.on('userCount', (count) => {
+    userCountSpan.textContent = count;
+});
+
+// Mesaj gönderme işlevi
+function sendMessage() {
+    const message = messageInput.value.trim();
+    if (message) {
+        socket.emit('chatMessage', {
+            roomId,
+            username,
+            message,
+            timestamp: new Date().toISOString()
         });
-
-        socket.on('connect', () => {
-            console.log('Connected to server');
-            updateConnectionStatus(true);
-            joinRoom(roomId);
-        });
-
-        socket.on('room-joined', ({ user, roomState }) => {
-            console.log('Joined room:', roomState.id);
-            currentUser = user;
-            currentRoom = roomState;
-            
-            // Save username for future use
-            if (user.name) {
-                localStorage.setItem('username', user.name);
-            }
-            
-            // Update UI
-            updateRoomInfo(roomState);
-            updateUserList(roomState.users);
-            loadChatHistory(roomState.messages);
-            showSuccess('Successfully joined the room!');
-        });
-
-        socket.on('user-connected', (user) => {
-            console.log('User connected:', user);
-            addUserToList(user);
-            showNotification(`${user.name} joined the room`);
-        });
-
-        socket.on('user-disconnected', (userId) => {
-            console.log('User disconnected:', userId);
-            removeUserFromList(userId);
-            const user = findUserById(userId);
-            if (user) {
-                showNotification(`${user.name} left the room`);
-            }
-        });
-
-        socket.on('chat-message', (message) => {
-            addChatMessage(message);
-        });
-
-        socket.on('user-typing', (userId) => {
-            const user = findUserById(userId);
-            if (user) {
-                showTypingIndicator(user.name);
-            }
-        });
-
-        socket.on('user-typing-stop', () => {
-            hideTypingIndicator();
-        });
-
-        socket.on('error', (error) => {
-            console.error('Socket error:', error);
-            showError(error.message);
-        });
-
-        socket.on('disconnect', (reason) => {
-            console.log('Disconnected:', reason);
-            updateConnectionStatus(false);
-            showError('Disconnected from server. Attempting to reconnect...');
-        });
-
-    } catch (error) {
-        console.error('Error initializing socket:', error);
-        showError('Failed to connect to server');
+        messageInput.value = '';
     }
 }
 
-// Room Functions
-function getRoomIdFromUrl() {
-    const path = window.location.pathname;
-    const match = path.match(/\/room\/([^\/]+)/);
-    return match ? match[1] : null;
+// Enter tuşu ile mesaj gönderme
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// Send butonu ile mesaj gönderme
+if (sendBtn) {
+    sendBtn.addEventListener('click', sendMessage);
 }
 
-function joinRoom(roomId) {
-    if (!socket) return;
+// Mesaj alma
+socket.on('chatMessage', (data) => {
+    appendMessage(data);
+});
+
+// Mesajı sohbete ekle
+function appendMessage(data) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${data.username === username ? 'own-message' : ''}`;
     
-    const username = localStorage.getItem('username');
-    socket.emit('join-room', {
-        roomId: roomId,
-        username: username
-    });
-}
-
-function updateRoomInfo(roomState) {
-    const roomIdElement = document.getElementById('roomId');
-    if (roomIdElement) {
-        roomIdElement.textContent = roomState.id;
-    }
-
-    const roomLinkElement = document.getElementById('roomLink');
-    if (roomLinkElement) {
-        const roomUrl = `${window.location.origin}/room/${roomState.id}`;
-        roomLinkElement.value = roomUrl;
-    }
-}
-
-// UI Functions
-function updateConnectionStatus(connected) {
-    const statusElement = document.getElementById('status');
-    if (statusElement) {
-        statusElement.textContent = connected ? 'Connected' : 'Disconnected';
-        statusElement.className = `status ${connected ? 'connected' : 'disconnected'}`;
-    }
-}
-
-function updateUserList(users) {
-    const usersList = document.getElementById('usersList');
-    if (!usersList) return;
-    
-    usersList.innerHTML = '';
-    users.forEach(user => {
-        const userElement = document.createElement('div');
-        userElement.className = 'user-item';
-        userElement.dataset.userId = user.id;
-        userElement.innerHTML = `
-            <span class="user-name">${user.name}</span>
-            ${user.id === currentUser?.id ? ' (You)' : ''}
-        `;
-        usersList.appendChild(userElement);
-    });
-}
-
-function loadChatHistory(messages) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
-    
-    chatMessages.innerHTML = '';
-    messages.forEach(addChatMessage);
-}
-
-function addChatMessage(message) {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
-
-    const messageElement = document.createElement('div');
-    messageElement.className = `message ${message.userId === currentUser?.id ? 'own-message' : ''}`;
-    messageElement.innerHTML = `
+    const messageContent = `
         <div class="message-header">
-            <span class="message-user">${message.username}</span>
-            <span class="message-time">${formatTime(message.timestamp)}</span>
+            <span class="username">${data.username}</span>
+            <span class="timestamp">${formatTimestamp(data.timestamp)}</span>
         </div>
-        <div class="message-content">${formatMessage(message.content)}</div>
+        <div class="message-content">${data.message}</div>
     `;
     
-    chatMessages.appendChild(messageElement);
+    messageDiv.innerHTML = messageContent;
+    chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function showTypingIndicator(username) {
-    const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
-        typingIndicator.textContent = `${username} is typing...`;
+// Yazıyor göstergesi
+let typingTimeout;
+messageInput.addEventListener('input', () => {
+    if (!typingTimeout) {
+        socket.emit('typing', { roomId, username });
+    }
+    
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        socket.emit('stopTyping', { roomId, username });
+        typingTimeout = null;
+    }, 1000);
+});
+
+socket.on('typing', (data) => {
+    if (data.username !== username) {
+        typingIndicator.textContent = `${data.username} is typing...`;
         typingIndicator.style.display = 'block';
     }
-}
+});
 
-function hideTypingIndicator() {
-    const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
-        typingIndicator.style.display = 'none';
+socket.on('stopTyping', () => {
+    typingIndicator.style.display = 'none';
+});
+
+// Ekran paylaşımı
+async function startScreenShare() {
+    try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true
+        });
+        
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.controls = true; // Video kontrollerini ekle
+        
+        const player = document.getElementById('player');
+        player.innerHTML = '';
+        player.appendChild(video);
+        
+        videoOverlay.style.display = 'none';
+        
+        // Stream kapandığında
+        stream.getVideoTracks()[0].onended = () => {
+            video.remove();
+            videoOverlay.style.display = 'flex';
+            showNotification('Screen sharing ended', 'info');
+        };
+
+        showNotification('Screen sharing started', 'success');
+        
+    } catch (error) {
+        console.error('Error sharing screen:', error);
+        showNotification('Failed to start screen sharing', 'error');
     }
 }
 
+// Ekran paylaşma butonu
+if (shareScreenBtn) {
+    shareScreenBtn.addEventListener('click', startScreenShare);
+}
+
+// Oda linkini kopyala
+function copyRoomLink() {
+    const roomLink = window.location.href;
+    navigator.clipboard.writeText(roomLink)
+        .then(() => showNotification('Room link copied to clipboard!', 'success'))
+        .catch(() => showNotification('Failed to copy room link', 'error'));
+}
+
+// Oda linkini kopyalama butonu
+if (copyBtn) {
+    copyBtn.addEventListener('click', copyRoomLink);
+}
+
+// Odadan ayrıl
+function leaveRoom() {
+    socket.emit('leaveRoom', { roomId, username });
+    window.location.href = '/';
+}
+
+// Odadan ayrılma butonu
+if (leaveBtn) {
+    leaveBtn.addEventListener('click', leaveRoom);
+}
+
+// Yardımcı fonksiyonlar
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// Bildirim göster
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
     
-    const container = document.getElementById('notificationContainer') || document.body;
+    const container = document.querySelector('.notification-container');
     container.appendChild(notification);
     
     setTimeout(() => {
@@ -217,95 +208,3 @@ function showNotification(message, type = 'info') {
         setTimeout(() => notification.remove(), 500);
     }, 3000);
 }
-
-function showError(message) {
-    showNotification(message, 'error');
-}
-
-function showSuccess(message) {
-    showNotification(message, 'success');
-}
-
-// Helper Functions
-function formatTime(timestamp) {
-    return new Date(timestamp).toLocaleTimeString();
-}
-
-function formatMessage(content) {
-    return content
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;')
-        .replace(/\n/g, '<br>')
-        .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
-}
-
-function findUserById(userId) {
-    const userElement = document.querySelector(`[data-user-id="${userId}"]`);
-    if (userElement) {
-        return {
-            id: userId,
-            name: userElement.querySelector('.user-name').textContent
-        };
-    }
-    return null;
-}
-
-// Event Handlers
-function handleChatInput(event) {
-    if (!socket || !currentUser) return;
-
-    if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        const input = event.target;
-        const message = input.value.trim();
-        
-        if (message) {
-            socket.emit('send-message', { message });
-            input.value = '';
-            stopTyping();
-        }
-    } else {
-        if (!isTyping) {
-            isTyping = true;
-            socket.emit('start-typing');
-        }
-        
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(stopTyping, 1000);
-    }
-}
-
-function stopTyping() {
-    if (isTyping) {
-        isTyping = false;
-        socket.emit('stop-typing');
-    }
-}
-
-function copyRoomLink() {
-    const roomLinkElement = document.getElementById('roomLink');
-    if (roomLinkElement) {
-        roomLinkElement.select();
-        document.execCommand('copy');
-        showSuccess('Room link copied to clipboard!');
-    }
-}
-
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    initializeSocket();
-    
-    // Add event listeners
-    const chatInput = document.getElementById('chatInput');
-    if (chatInput) {
-        chatInput.addEventListener('keypress', handleChatInput);
-    }
-    
-    const copyLinkButton = document.getElementById('copyLink');
-    if (copyLinkButton) {
-        copyLinkButton.addEventListener('click', copyRoomLink);
-    }
-});

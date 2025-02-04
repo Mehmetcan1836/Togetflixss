@@ -1,12 +1,14 @@
 /* Global Styles */
 :root {
-    --primary-color: #e50914;
-    --secondary-color: #221f1f;
-    --text-color: #ffffff;
-    --background-color: #000000;
-    --input-background: #333333;
-    --success-color: #2ecc71;
-    --error-color: #e74c3c;
+    --primary-color: #e11d48;
+    --primary-dark: #be123c;
+    --primary-light: #fb7185;
+    --background-color: #18181b;
+    --surface-color: #27272a;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --border-radius: 12px;
+    --transition-speed: 0.3s;
     --top-bar-height: 60px;
     --controls-bar-height: 70px;
     --side-panel-width: 320px;
@@ -16,7 +18,6 @@
     --z-index-side-panel: 90;
     --z-index-modal: 1000;
     --z-index-toast: 2000;
-    --text-secondary: #888;
 }
 
 * {
@@ -26,15 +27,11 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--background-color);
-    color: var(--text-color);
-    line-height: 1.6;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-    width: 100vw;
-    height: 100vh;
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
@@ -46,7 +43,7 @@ header {
     display: flex;
     align-items: center;
     gap: 2rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--text-secondary);
 }
 
 .logo {
@@ -61,7 +58,7 @@ header {
 }
 
 .logo span {
-    color: var(--text-color);
+    color: var(--text-primary);
     font-weight: 600;
     font-size: 1.2rem;
 }
@@ -77,7 +74,7 @@ header {
     border: none;
     border-radius: 4px;
     padding: 0.6rem 1rem;
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 0.9rem;
 }
 
@@ -335,7 +332,7 @@ body:not(.cursor-idle) .room-id,
     height: var(--controls-bar-height);
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--text-secondary);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -374,7 +371,7 @@ body:not(.cursor-idle) .room-id,
 }
 
 .control-btn[data-action="toggle-chat"]:hover {
-    background: var(--primary-color-hover);
+    background: var(--primary-dark);
 }
 
 .control-btn[data-action="toggle-chat"] i {
@@ -382,11 +379,11 @@ body:not(.cursor-idle) .room-id,
 }
 
 .leave-btn {
-    background: var(--danger-color) !important;
+    background: var(--primary-dark) !important;
 }
 
 .leave-btn:hover {
-    background: var(--danger-color-hover) !important;
+    background: var(--primary-color) !important;
 }
 
 /* Control Buttons */
@@ -506,7 +503,7 @@ body:not(.cursor-idle) .room-id,
     height: calc(100vh - var(--top-bar-height) - var(--controls-bar-height));
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--text-secondary);
     display: flex;
     flex-direction: column;
     transition: right 0.3s ease-in-out;
@@ -535,7 +532,7 @@ body:not(.cursor-idle) .room-id,
 
 .chat-message .sender {
     font-weight: bold;
-    color: var(--text-color);
+    color: var(--text-primary);
     margin-right: 8px;
 }
 
@@ -548,7 +545,7 @@ body:not(.cursor-idle) .room-id,
 .chat-input-container {
     padding: 20px;
     background: rgba(0, 0, 0, 0.5);
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--text-secondary);
     display: flex;
     gap: 10px;
 }
@@ -556,7 +553,7 @@ body:not(.cursor-idle) .room-id,
 .chat-input-container input {
     flex: 1;
     background: rgba(255, 255, 255, 0.1);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--text-secondary);
     border-radius: 20px;
     padding: 10px 20px;
     color: white;
@@ -586,7 +583,7 @@ body:not(.cursor-idle) .room-id,
 
 .chat-input-container button:hover {
     transform: scale(1.1);
-    background: var(--primary-color-hover);
+    background: var(--primary-dark);
 }
 
 /* Chat Messages Area */
@@ -599,7 +596,7 @@ body:not(.cursor-idle) .room-id,
 /* Chat Input Area */
 .chat-input-container {
     padding: 20px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--text-secondary);
     background: rgba(0, 0, 0, 0.3);
 }
 
@@ -632,7 +629,7 @@ body:not(.cursor-idle) .room-id,
     height: calc(100vh - var(--top-bar-height) - var(--controls-bar-height));
     background: rgba(0, 0, 0, 0.95);
     backdrop-filter: blur(10px);
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--text-secondary);
     display: flex;
     flex-direction: column;
     transform: translateX(0);
@@ -677,7 +674,7 @@ body:not(.cursor-idle) .room-id,
 }
 
 .message-content {
-    color: var(--text-color);
+    color: var(--text-primary);
     word-break: break-word;
     line-height: 1.4;
 }
@@ -685,7 +682,7 @@ body:not(.cursor-idle) .room-id,
 /* Chat Input */
 .chat-input-container {
     padding: 15px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--text-secondary);
     background: rgba(0, 0, 0, 0.3);
     display: flex;
     gap: 10px;
@@ -695,9 +692,9 @@ body:not(.cursor-idle) .room-id,
     flex: 1;
     padding: 10px 15px;
     border-radius: 20px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--text-secondary);
     background: rgba(255, 255, 255, 0.05);
-    color: var(--text-color);
+    color: var(--text-primary);
     font-size: 14px;
     outline: none;
     transition: all 0.2s ease;
@@ -713,7 +710,7 @@ body:not(.cursor-idle) .room-id,
 }
 
 .chat-input-container .control-btn:hover {
-    background: var(--secondary-color);
+    background: var(--primary-dark);
     transform: scale(1.1);
 }
 
@@ -730,7 +727,7 @@ body:not(.cursor-idle) .room-id,
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--text-secondary);
     z-index: var(--z-index-controls);
 }
 
@@ -747,7 +744,7 @@ body:not(.cursor-idle) .room-id,
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--text-secondary);
     z-index: var(--z-index-controls);
 }
 
@@ -851,7 +848,7 @@ body:not(.cursor-idle) .room-id,
 /* Panel Header */
 .panel-header {
     padding: 16px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--text-secondary);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -870,7 +867,7 @@ body:not(.cursor-idle) .room-id,
 .panel-btn {
     background: none;
     border: none;
-    color: var(--text-color);
+    color: var(--text-primary);
     padding: 8px;
     border-radius: 4px;
     cursor: pointer;
@@ -1343,7 +1340,7 @@ body:not(.cursor-idle) .room-id,
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background-color: var(--secondary-color);
+    background-color: var(--surface-color);
     z-index: var(--z-index-video);
 }
 
@@ -1764,7 +1761,7 @@ body:not(.cursor-idle) .room-id,
     right: 20px;
     bottom: calc(var(--controls-bar-height) + 20px);
     background: rgba(0, 0, 0, 0.8);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--text-secondary);
     color: white;
     padding: 8px 12px;
     border-radius: 8px;
@@ -1798,13 +1795,15 @@ body:not(.cursor-idle) .room-id,
 
 /* Variables */
 :root {
-    --primary-color: #e50914;
-    --secondary-color: #221f1f;
-    --text-color: #ffffff;
-    --background-color: #000000;
-    --input-background: #333333;
-    --success-color: #2ecc71;
-    --error-color: #e74c3c;
+    --primary-color: #e11d48;
+    --primary-dark: #be123c;
+    --primary-light: #fb7185;
+    --background-color: #18181b;
+    --surface-color: #27272a;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --border-radius: 12px;
+    --transition-speed: 0.3s;
     --top-bar-height: 60px;
     --controls-bar-height: 70px;
     --side-panel-width: 320px;
@@ -1820,7 +1819,7 @@ body:not(.cursor-idle) .room-id,
 body {
     font-family: 'Helvetica Neue', Arial, sans-serif;
     background-color: var(--background-color);
-    color: var(--text-color);
+    color: var(--text-primary);
     line-height: 1.5;
     overflow: hidden;
 }
@@ -1984,7 +1983,7 @@ body {
     height: calc(100vh - var(--top-bar-height) - var(--controls-bar-height));
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
-    border-left: 1px solid var(--border-color);
+    border-left: 1px solid var(--text-secondary);
     display: flex;
     flex-direction: column;
     transition: right 0.3s ease-in-out;
@@ -2004,7 +2003,7 @@ body {
     height: var(--controls-bar-height);
     background: rgba(0, 0, 0, 0.8);
     backdrop-filter: blur(10px);
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--text-secondary);
     display: flex;
     justify-content: space-between;
     align-items: center;
