@@ -3,118 +3,271 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Togetflix - Birlikte İzle</title>
-    <link rel="stylesheet" href="/css/styles.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/utils.js"></script>
-    <script src="/js/app.js"></script>
+    <title>Togetflix - Arkadaşlarınla Birlikte İzle</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/landing.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <header class="main-header">
-            <h1>Togetflix</h1>
-            <p class="tagline">Arkadaşlarınla birlikte izle, paylaş, sohbet et!</p>
-        </header>
+<body class="landing-page">
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="logo">
+                <img src="images/logo.png" alt="Togetflix Logo">
+                <span>Togetflix</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Özellikler</a>
+                <a href="#how-it-works">Nasıl Çalışır</a>
+                <a href="#premium">Premium</a>
+                <a href="#faq">SSS</a>
+            </div>
+            <div class="nav-auth">
+                <button class="btn btn-login">Giriş Yap</button>
+                <button class="btn btn-signup">Üye Ol</button>
+            </div>
+            <button class="mobile-menu-btn">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
 
-        <main class="main-content">
-            <div class="join-section">
-                <div class="form-group">
-                    <label for="username">Kullanıcı Adın</label>
-                    <input type="text" id="username" placeholder="Kullanıcı adını gir veya boş bırak">
+    <header class="hero">
+        <div class="hero-content">
+            <h1>Arkadaşlarınla Birlikte İzlemenin En İyi Yolu</h1>
+            <p>YouTube videoları ve ekran paylaşımı ile uzaktaki arkadaşlarınla birlikte izlemenin keyfini çıkar!</p>
+            <div class="hero-buttons">
+                <button class="btn btn-primary create-room">Oda Oluştur</button>
+                <button class="btn btn-secondary join-room">Odaya Katıl</button>
+            </div>
+            <div class="join-form hidden">
+                <input type="text" id="roomIdInput" placeholder="Oda ID'sini girin">
+                <button class="btn btn-primary" id="joinBtn">Katıl</button>
+            </div>
+        </div>
+        <div class="hero-image">
+            <img src="images/hero.png" alt="Togetflix Preview">
+        </div>
+    </header>
+
+    <section id="features" class="features">
+        <h2>Özellikler</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <i class="fas fa-video"></i>
+                <h3>YouTube Senkronizasyonu</h3>
+                <p>YouTube videolarını arkadaşlarınla tam senkronize izle</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-desktop"></i>
+                <h3>Ekran Paylaşımı</h3>
+                <p>Ekranını paylaşarak istediğin içeriği birlikte izle</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-comments"></i>
+                <h3>Gerçek Zamanlı Sohbet</h3>
+                <p>Video izlerken arkadaşlarınla sohbet et</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-smile"></i>
+                <h3>Emoji Reaksiyonları</h3>
+                <p>Videolara emoji ile tepki ver</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-users"></i>
+                <h3>Sınırsız Katılımcı</h3>
+                <p>İstediğin kadar arkadaşını odana davet et</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-lock"></i>
+                <h3>Güvenli Bağlantı</h3>
+                <p>End-to-end şifreli güvenli iletişim</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="how-it-works">
+        <h2>Nasıl Çalışır?</h2>
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>Oda Oluştur</h3>
+                <p>Yeni bir oda oluştur ve arkadaşlarını davet et</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>İçerik Seç</h3>
+                <p>YouTube videosu seç veya ekranını paylaş</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>Birlikte İzle</h3>
+                <p>Arkadaşlarınla senkronize bir şekilde izle</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="premium" class="premium">
+        <h2>Premium Özellikler</h2>
+        <div class="plans">
+            <div class="plan">
+                <h3>Ücretsiz</h3>
+                <div class="price">₺0<span>/ay</span></div>
+                <ul>
+                    <li><i class="fas fa-check"></i> YouTube Senkronizasyonu</li>
+                    <li><i class="fas fa-check"></i> Ekran Paylaşımı</li>
+                    <li><i class="fas fa-check"></i> Temel Sohbet</li>
+                    <li><i class="fas fa-times"></i> HD Kalite</li>
+                    <li><i class="fas fa-times"></i> Özel Emojiler</li>
+                    <li><i class="fas fa-times"></i> Reklamsız Deneyim</li>
+                </ul>
+                <button class="btn btn-secondary">Başla</button>
+            </div>
+            <div class="plan featured">
+                <div class="plan-badge">Popüler</div>
+                <h3>Premium</h3>
+                <div class="price">₺29<span>/ay</span></div>
+                <ul>
+                    <li><i class="fas fa-check"></i> Tüm Ücretsiz Özellikler</li>
+                    <li><i class="fas fa-check"></i> 4K Video Kalitesi</li>
+                    <li><i class="fas fa-check"></i> Özel Emoji Paketi</li>
+                    <li><i class="fas fa-check"></i> Reklamsız Deneyim</li>
+                    <li><i class="fas fa-check"></i> Öncelikli Destek</li>
+                    <li><i class="fas fa-check"></i> Özel Oda Temaları</li>
+                </ul>
+                <button class="btn btn-primary">Hemen Başla</button>
+            </div>
+            <div class="plan">
+                <h3>Takım</h3>
+                <div class="price">₺99<span>/ay</span></div>
+                <ul>
+                    <li><i class="fas fa-check"></i> Tüm Premium Özellikler</li>
+                    <li><i class="fas fa-check"></i> Sınırsız Katılımcı</li>
+                    <li><i class="fas fa-check"></i> Özel Alt Alan Adı</li>
+                    <li><i class="fas fa-check"></i> Admin Kontrolleri</li>
+                    <li><i class="fas fa-check"></i> API Erişimi</li>
+                    <li><i class="fas fa-check"></i> 7/24 Destek</li>
+                </ul>
+                <button class="btn btn-secondary">İletişime Geç</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="faq" class="faq">
+        <h2>Sıkça Sorulan Sorular</h2>
+        <div class="faq-grid">
+            <div class="faq-item">
+                <div class="faq-question">
+                    <h3>Togetflix nasıl çalışır?</h3>
+                    <i class="fas fa-chevron-down"></i>
                 </div>
-
-                <div class="room-actions">
-                    <div class="create-room">
-                        <h2>Yeni Oda Oluştur</h2>
-                        <button id="createRoom" class="btn primary">Oda Oluştur</button>
-                    </div>
-
-                    <div class="join-room">
-                        <h2>Odaya Katıl</h2>
-                        <div class="form-group">
-                            <input type="text" id="roomId" placeholder="Oda ID'sini gir">
-                            <button id="joinRoom" class="btn secondary">Katıl</button>
-                        </div>
-                    </div>
+                <div class="faq-answer">
+                    <p>Togetflix, arkadaşlarınızla birlikte video izlemenizi sağlayan bir platformdur. Bir oda oluşturup arkadaşlarınızı davet edebilir, YouTube videoları izleyebilir veya ekranınızı paylaşabilirsiniz.</p>
                 </div>
             </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    <h3>Kaç kişi katılabilir?</h3>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    <p>Ücretsiz planda 10 kişiye kadar katılımcı kabul edilebilir. Premium ve Takım planlarında bu sınır kaldırılmıştır.</p>
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    <h3>İnternet hızım yeterli mi?</h3>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    <p>Togetflix, farklı internet hızlarına uyum sağlayabilen adaptif bir sisteme sahiptir. Minimum 1 Mbps hız önerilir.</p>
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-question">
+                    <h3>Hangi tarayıcıları destekliyor?</h3>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="faq-answer">
+                    <p>Chrome, Firefox, Safari ve Edge gibi modern tarayıcıların güncel sürümlerini destekliyoruz.</p>
+                </div>
+            </div>
+        </div>
+    </section>
 
-            <div class="features">
-                <h2>Özellikler</h2>
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h4>Togetflix</h4>
+                <p>Arkadaşlarınla birlikte izlemenin en iyi yolu</p>
+                <div class="social-links">
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-facebook"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                    <a href="#"><i class="fab fa-discord"></i></a>
+                </div>
+            </div>
+            <div class="footer-section">
+                <h4>Ürün</h4>
                 <ul>
-                    <li>
-                        <span class="icon">🎥</span>
-                        <h3>Ekran Paylaşımı</h3>
-                        <p>Ekranını paylaşarak arkadaşlarınla birlikte içerik izle</p>
-                    </li>
-                    <li>
-                        <span class="icon">📺</span>
-                        <h3>YouTube Senkronizasyonu</h3>
-                        <p>YouTube videolarını arkadaşlarınla senkronize izle</p>
-                    </li>
-                    <li>
-                        <span class="icon">💬</span>
-                        <h3>Anlık Sohbet</h3>
-                        <p>İzlerken arkadaşlarınla sohbet et</p>
-                    </li>
-                    <li>
-                        <span class="icon">👑</span>
-                        <h3>Moderatör Kontrolü</h3>
-                        <p>Oda sahibi olarak izinleri ve içeriği yönet</p>
-                    </li>
+                    <li><a href="#features">Özellikler</a></li>
+                    <li><a href="#premium">Premium</a></li>
+                    <li><a href="#faq">SSS</a></li>
+                    <li><a href="#">Blog</a></li>
                 </ul>
             </div>
-        </main>
-
-        <footer class="main-footer">
+            <div class="footer-section">
+                <h4>Şirket</h4>
+                <ul>
+                    <li><a href="#">Hakkımızda</a></li>
+                    <li><a href="#">Kariyer</a></li>
+                    <li><a href="#">İletişim</a></li>
+                    <li><a href="#">Basın</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>Yasal</h4>
+                <ul>
+                    <li><a href="#">Gizlilik Politikası</a></li>
+                    <li><a href="#">Kullanım Koşulları</a></li>
+                    <li><a href="#">KVKK</a></li>
+                    <li><a href="#">Çerez Politikası</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
             <p>&copy; 2024 Togetflix. Tüm hakları saklıdır.</p>
-        </footer>
+            <div class="language-selector">
+                <i class="fas fa-globe"></i>
+                <select>
+                    <option value="tr">Türkçe</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+        </div>
+    </footer>
+
+    <div class="mobile-menu">
+        <div class="mobile-menu-header">
+            <img src="images/logo.png" alt="Togetflix Logo">
+            <button class="mobile-menu-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="mobile-menu-links">
+            <a href="#features">Özellikler</a>
+            <a href="#how-it-works">Nasıl Çalışır</a>
+            <a href="#premium">Premium</a>
+            <a href="#faq">SSS</a>
+        </div>
+        <div class="mobile-menu-auth">
+            <button class="btn btn-login">Giriş Yap</button>
+            <button class="btn btn-signup">Üye Ol</button>
+        </div>
     </div>
 
-    <div class="notification-container"></div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const createRoomButton = document.getElementById('createRoom');
-            const joinRoomButton = document.getElementById('joinRoom');
-            const roomIdInput = document.getElementById('roomId');
-
-            createRoomButton.addEventListener('click', async () => {
-                try {
-                    const response = await fetch('/api/rooms', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    const data = await response.json();
-                    if (data.roomId) {
-                        window.location.href = `/room/${data.roomId}`;
-                    } else {
-                        alert('Failed to create room. Please try again.');
-                    }
-                } catch (error) {
-                    console.error('Error creating room:', error);
-                    alert('Failed to create room. Please try again.');
-                }
-            });
-
-            joinRoomButton.addEventListener('click', () => {
-                const roomId = roomIdInput.value.trim();
-                if (roomId) {
-                    window.location.href = `/room/${roomId}`;
-                } else {
-                    alert('Please enter a room ID');
-                }
-            });
-
-            roomIdInput.addEventListener('keypress', (event) => {
-                if (event.key === 'Enter') {
-                    joinRoomButton.click();
-                }
-            });
-        });
-    </script>
+    <script src="js/app.js"></script>
 </body>
 </html>
