@@ -33,7 +33,17 @@ const PERMISSIONS = {
 
 // Middleware
 app.use(express.json());
-app.use(express.static('public'));
+
+// Serve static files with proper MIME types
+app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        }
+        // Add cache control for better performance
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+    }
+}));
 
 // Routes
 app.get('/', (req, res) => {

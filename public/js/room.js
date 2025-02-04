@@ -53,34 +53,31 @@ function onYouTubeIframeAPIReady() {
         videoId: '',
         playerVars: {
             'playsinline': 1,
-            'controls': 1,
-            'rel': 0
+            'enablejsapi': 1,
+            'origin': window.location.origin,
+            'widget_referrer': window.location.origin
         },
         events: {
             'onReady': onPlayerReady,
-            'onStateChange': onPlayerStateChange,
-            'onError': onPlayerError
+            'onStateChange': onPlayerStateChange
         }
     });
 }
 
 function onPlayerReady(event) {
     console.log('Player ready');
-    document.getElementById('videoOverlay').style.display = 'flex';
 }
 
 function onPlayerStateChange(event) {
-    if (socket) {
-        socket.emit('videoStateChange', {
-            state: event.data,
-            time: player.getCurrentTime()
-        });
+    // Handle player state changes
+    switch(event.data) {
+        case YT.PlayerState.PLAYING:
+            document.getElementById('videoOverlay').style.display = 'none';
+            break;
+        case YT.PlayerState.ENDED:
+            document.getElementById('videoOverlay').style.display = 'flex';
+            break;
     }
-}
-
-function onPlayerError(event) {
-    console.error('Player error:', event.data);
-    showNotification('Video yüklenirken bir hata oluştu', 'error');
 }
 
 // ============ Media Control Functions ============
@@ -337,7 +334,15 @@ function initializeSocket() {
 // ============ YouTube API Functions ============
 async function searchYouTubeVideos(query, pageToken = '') {
     try {
-        const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=YOUR_API_KEY${pageToken ? '&pageToken=' + pageToken : ''}`);
+        if (!query) return null;
+        
+        const API_KEY = 'AIzaSyDVhKUC83wcj6Q_3auQVLnjRJFB_HzIom0'; // Replace with your actual API key
+        const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}${pageToken ? '&pageToken=' + pageToken : ''}`);
+        
+        if (!response.ok) {
+            throw new Error('YouTube API error');
+        }
+        
         const data = await response.json();
         return data;
     } catch (error) {
@@ -349,12 +354,18 @@ async function searchYouTubeVideos(query, pageToken = '') {
 
 function displayVideoResults(videos, append = false) {
     const resultsContainer = document.getElementById('videoResults');
+    if (!resultsContainer) return;
     
     if (!append) {
         resultsContainer.innerHTML = '';
     }
     
-    videos.forEach(video => {
+    if (!videos || !videos.items || !Array.isArray(videos.items)) {
+        resultsContainer.innerHTML = '<div class="no-results">Sonuç bulunamadı</div>';
+        return;
+    }
+    
+    videos.items.forEach(video => {
         const videoElement = document.createElement('div');
         videoElement.className = 'video-item';
         videoElement.innerHTML = `
@@ -371,8 +382,11 @@ function displayVideoResults(videos, append = false) {
         `;
         
         videoElement.addEventListener('click', () => {
-            loadVideo(video.id.videoId);
-            closeVideoModal();
+            if (player && video.id && video.id.videoId) {
+                player.loadVideoById(video.id.videoId);
+                closeVideoModal();
+                document.getElementById('videoOverlay').style.display = 'none';
+            }
         });
         
         resultsContainer.appendChild(videoElement);
@@ -419,14 +433,25 @@ function handleVideoScroll(event) {
 }
 
 function showVideoModal() {
-    const modal = document.getElementById('videoUrlModal');
-    modal.style.display = 'block';
-    document.getElementById('videoSearchInput').focus();
+    const modalOverlay = document.getElementById('videoModalOverlay');
+    const modal = document.getElementById('videoSearchModal');
+    if (modalOverlay && modal) {
+        modalOverlay.style.display = 'block';
+        modal.style.display = 'block';
+        const searchInput = document.getElementById('videoSearchInput');
+        if (searchInput) {
+            searchInput.focus();
+        }
+    }
 }
 
 function closeVideoModal() {
-    const modal = document.getElementById('videoUrlModal');
-    modal.style.display = 'none';
+    const modalOverlay = document.getElementById('videoModalOverlay');
+    const modal = document.getElementById('videoSearchModal');
+    if (modalOverlay && modal) {
+        modalOverlay.style.display = 'none';
+        modal.style.display = 'none';
+    }
 }
 
 // ============ Event Listeners ============
@@ -436,11 +461,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize socket connection
     initializeSocket();
     
-    // Set up video overlay
+    // Set up video overlay and modal
     const videoOverlay = document.getElementById('videoOverlay');
     const videoSearchInput = document.getElementById('videoSearchInput');
     const videoResults = document.getElementById('videoResults');
-    const closeVideoModalBtn = document.getElementById('closeVideoUrlModal');
+    const closeVideoModalBtn = document.getElementById('closeVideoModal');
+    const modalOverlay = document.getElementById('videoModalOverlay');
 
     if (videoOverlay) {
         videoOverlay.addEventListener('click', showVideoModal);
@@ -458,74 +484,55 @@ document.addEventListener('DOMContentLoaded', () => {
         closeVideoModalBtn.addEventListener('click', closeVideoModal);
     }
 
-    // Set up media control buttons
-    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
-    const toggleMicBtn = document.getElementById('toggleMicBtn');
-    const screenShareBtn = document.getElementById('screenShareBtn');
-    const settingsBtn = document.getElementById('settingsBtn');
-
-    if (toggleCameraBtn) {
-        toggleCameraBtn.addEventListener('click', toggleCamera);
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', closeVideoModal);
     }
 
-    if (toggleMicBtn) {
-        toggleMicBtn.addEventListener('click', toggleMicrophone);
-    }
-
-    if (screenShareBtn) {
-        screenShareBtn.addEventListener('click', toggleScreenShare);
-    }
-
-    if (settingsBtn) {
-        settingsBtn.addEventListener('click', () => {
-            document.getElementById('settingsModal').style.display = 'block';
+    // Prevent modal close when clicking inside
+    const videoSearchModal = document.getElementById('videoSearchModal');
+    if (videoSearchModal) {
+        videoSearchModal.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
     }
 
-    // Set up room control buttons
-    const copyRoomLinkBtn = document.getElementById('copyRoomLink');
-    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
-
-    if (copyRoomLinkBtn) {
-        copyRoomLinkBtn.addEventListener('click', copyRoomLink);
-    }
-
-    if (leaveRoomBtn) {
-        leaveRoomBtn.addEventListener('click', leaveRoom);
-    }
-
-    // Set up chat
-    const sendMessageBtn = document.getElementById('sendMessageBtn');
-    const messageInput = document.getElementById('messageInput');
-
-    if (sendMessageBtn && messageInput) {
-        sendMessageBtn.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-    }
-
-    // Set up room info
-    const roomIdElement = document.getElementById('roomId');
-    if (roomIdElement) {
-        roomIdElement.textContent = roomId;
-    }
-
-    // Initialize media devices
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-        .then(stream => {
-            localStream = stream;
-            stream.getTracks().forEach(track => track.enabled = false);
-        })
-        .catch(error => {
-            console.error('Media device error:', error);
-            showNotification('Kamera ve mikrofon erişimi reddedildi', 'error');
-        });
+    // Initialize media devices with fallback
+    initializeMediaDevices();
 
     console.log('Room initialization complete');
 });
+
+async function initializeMediaDevices() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: true, 
+            audio: true 
+        });
+        
+        localStream = stream;
+        // Start with devices disabled
+        stream.getTracks().forEach(track => track.enabled = false);
+        
+    } catch (error) {
+        console.log('Media device initialization with fallback:', error.name);
+        
+        // Try audio only if video fails
+        if (error.name === 'NotFoundError' || error.name === 'NotAllowedError') {
+            try {
+                const audioStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true 
+                });
+                localStream = audioStream;
+                audioStream.getTracks().forEach(track => track.enabled = false);
+            } catch (audioError) {
+                console.error('Audio device error:', audioError);
+                showNotification('Mikrofon erişimi sağlanamadı', 'warning');
+            }
+        } else {
+            showNotification('Medya cihazlarına erişim reddedildi', 'warning');
+        }
+    }
+}
 
 function extractVideoId(url) {
     if (!url) return null;
