@@ -47,6 +47,18 @@ function initializeSocket() {
             socket.io.opts.transports = ['polling', 'websocket'];
             socket.connect();
         }, 2000);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('Disconnected:', reason);
+        updateConnectionStatus(false);
+        
+        if (reason === 'io server disconnect') {
+            // Sunucu tarafından bağlantı kesildi, yeniden bağlanmayı dene
+            setTimeout(() => {
+                socket.connect();
+            }, 1000);
+        }
         // Diğer disconnect sebepleri için socket.io otomatik olarak yeniden bağlanmayı deneyecek
     });
 
