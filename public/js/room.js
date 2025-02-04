@@ -21,27 +21,29 @@ function initializeSocket() {
         path: '/socket.io',
         transports: ['polling', 'websocket'],
         reconnection: true,
-        reconnectionAttempts: 3,
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        timeout: 20000,
-        autoConnect: false
+        timeout: 60000,
+        autoConnect: true,
+        forceNew: true
     };
 
-    socket = io(window.location.origin, socketOptions);
+    socket = io(window.location.origin.replace(/^http/, 'ws'), socketOptions);
 
     socket.on('connect_error', (error) => {
         console.error('Socket connection error:', error);
         document.getElementById('status').textContent = 'Connection Error';
         document.getElementById('status').style.color = 'red';
         
-        // Try to reconnect after a delay
+        // Try to reconnect after a delay with exponential backoff
+        const retryDelay = Math.min(1000 * Math.pow(2, socket.reconnectionAttempts), 10000);
         setTimeout(() => {
             if (!socket.connected) {
                 console.log('Attempting to reconnect...');
                 socket.connect();
             }
-        }, 2000);
+        }, retryDelay);
     });
 
     socket.on('connect', () => {
