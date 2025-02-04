@@ -69,13 +69,30 @@ function onPlayerReady(event) {
 }
 
 function onPlayerStateChange(event) {
-    // Handle player state changes
+    const videoOverlay = document.getElementById('videoOverlay');
+    
     switch(event.data) {
         case YT.PlayerState.PLAYING:
-            document.getElementById('videoOverlay').style.display = 'none';
+            videoOverlay.style.display = 'none';
+            if (socket) {
+                socket.emit('video-state', {
+                    state: 'play',
+                    time: player.getCurrentTime()
+                });
+            }
             break;
+            
+        case YT.PlayerState.PAUSED:
+            if (socket) {
+                socket.emit('video-state', {
+                    state: 'pause',
+                    time: player.getCurrentTime()
+                });
+            }
+            break;
+            
         case YT.PlayerState.ENDED:
-            document.getElementById('videoOverlay').style.display = 'flex';
+            videoOverlay.style.display = 'flex';
             break;
     }
 }
@@ -83,55 +100,61 @@ function onPlayerStateChange(event) {
 // ============ Media Control Functions ============
 async function toggleCamera() {
     try {
-        const button = document.getElementById('toggleCameraBtn');
-        
-        if (localStream && localStream.getVideoTracks().length > 0) {
-            localStream.getVideoTracks().forEach(track => track.stop());
-            button.classList.remove('active');
-            showNotification('Kamera kapatıldı', 'info');
-        } else {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            localStream = stream;
-            button.classList.add('active');
-            showNotification('Kamera açıldı', 'success');
+        if (!localStream) {
+            localStream = await navigator.mediaDevices.getUserMedia({ video: true });
         }
-        
-        if (socket) {
-            socket.emit('mediaStateChange', {
-                type: 'camera',
-                enabled: button.classList.contains('active')
-            });
+
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = !videoTrack.enabled;
+            const button = document.getElementById('toggleCameraBtn');
+            button.classList.toggle('active', videoTrack.enabled);
+            
+            if (socket) {
+                socket.emit('media-state-change', {
+                    type: 'camera',
+                    enabled: videoTrack.enabled
+                });
+            }
+            
+            showNotification(
+                videoTrack.enabled ? 'Kamera açıldı' : 'Kamera kapatıldı',
+                'info'
+            );
         }
     } catch (error) {
-        console.error('Camera error:', error);
-        showNotification('Kamera erişiminde hata oluştu', 'error');
+        console.error('Camera toggle error:', error);
+        showNotification('Kamera erişimi sağlanamadı', 'error');
     }
 }
 
 async function toggleMicrophone() {
     try {
-        const button = document.getElementById('toggleMicBtn');
-        
-        if (localStream && localStream.getAudioTracks().length > 0) {
-            localStream.getAudioTracks().forEach(track => track.stop());
-            button.classList.remove('active');
-            showNotification('Mikrofon kapatıldı', 'info');
-        } else {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            localStream = stream;
-            button.classList.add('active');
-            showNotification('Mikrofon açıldı', 'success');
+        if (!localStream) {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-        
-        if (socket) {
-            socket.emit('mediaStateChange', {
-                type: 'microphone',
-                enabled: button.classList.contains('active')
-            });
+
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = !audioTrack.enabled;
+            const button = document.getElementById('toggleMicBtn');
+            button.classList.toggle('active', audioTrack.enabled);
+            
+            if (socket) {
+                socket.emit('media-state-change', {
+                    type: 'mic',
+                    enabled: audioTrack.enabled
+                });
+            }
+            
+            showNotification(
+                audioTrack.enabled ? 'Mikrofon açıldı' : 'Mikrofon kapatıldı',
+                'info'
+            );
         }
     } catch (error) {
-        console.error('Microphone error:', error);
-        showNotification('Mikrofon erişiminde hata oluştu', 'error');
+        console.error('Microphone toggle error:', error);
+        showNotification('Mikrofon erişimi sağlanamadı', 'error');
     }
 }
 
@@ -149,7 +172,6 @@ async function toggleScreenShare() {
             button.classList.remove('active');
             showNotification('Ekran paylaşımı durduruldu', 'info');
             
-            // Video yüklenmemişse overlay'i göster
             if (!player || !player.getVideoUrl()) {
                 videoOverlay.style.display = 'flex';
             }
@@ -169,7 +191,6 @@ async function toggleScreenShare() {
             videoOverlay.style.display = 'none';
             showNotification('Ekran paylaşımı başlatıldı', 'success');
             
-            // Ekran paylaşımı durdurulduğunda
             stream.getVideoTracks()[0].onended = () => {
                 screenStream = null;
                 screenVideo.style.display = 'none';
@@ -177,7 +198,6 @@ async function toggleScreenShare() {
                 button.classList.remove('active');
                 showNotification('Ekran paylaşımı durduruldu', 'info');
                 
-                // Video yüklenmemişse overlay'i göster
                 if (!player || !player.getVideoUrl()) {
                     videoOverlay.style.display = 'flex';
                 }
@@ -185,7 +205,7 @@ async function toggleScreenShare() {
         }
         
         if (socket) {
-            socket.emit('mediaStateChange', {
+            socket.emit('media-state-change', {
                 type: 'screen',
                 enabled: button.classList.contains('active')
             });
@@ -198,8 +218,8 @@ async function toggleScreenShare() {
 
 // ============ Room Control Functions ============
 function copyRoomLink() {
-    const roomLink = window.location.href;
-    navigator.clipboard.writeText(roomLink)
+    const roomUrl = window.location.href;
+    navigator.clipboard.writeText(roomUrl)
         .then(() => {
             showNotification('Oda bağlantısı kopyalandı', 'success');
         })
@@ -209,46 +229,111 @@ function copyRoomLink() {
 }
 
 function leaveRoom() {
-    if (socket) {
-        socket.disconnect();
+    if (confirm('Odadan ayrılmak istediğinize emin misiniz?')) {
+        if (socket) {
+            socket.disconnect();
+        }
+        window.location.href = '/';
     }
-    window.location.href = '/';
 }
 
 // ============ Chat Functions ============
+function initializeChat() {
+    const messageInput = document.getElementById('messageInput');
+    const sendMessageBtn = document.getElementById('sendMessageBtn');
+    const chatMessages = document.getElementById('chatMessages');
+
+    // Send message on button click
+    sendMessageBtn.addEventListener('click', () => {
+        sendMessage();
+    });
+
+    // Send message on Enter key
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    // Socket event for receiving messages
+    socket.on('chat-message', (data) => {
+        addMessageToChat(data.sender, data.message, false);
+    });
+}
+
 function sendMessage() {
-    const input = document.getElementById('messageInput');
-    const message = input.value.trim();
+    const messageInput = document.getElementById('messageInput');
+    const message = messageInput.value.trim();
     
-    if (message && socket) {
-        socket.emit('chatMessage', {
-            user: currentUser,
-            message: message,
-            timestamp: new Date().toISOString()
+    if (message) {
+        socket.emit('chat-message', {
+            roomId: roomId,
+            message: message
         });
-        input.value = '';
+        
+        addMessageToChat('You', message, true);
+        messageInput.value = '';
     }
 }
 
-function addMessageToChat(data) {
+function addMessageToChat(sender, message, isOwn = false) {
     const chatMessages = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'chat-message';
-    messageDiv.innerHTML = `
-        <strong>${data.user.name}:</strong> ${data.message}
+    const messageElement = document.createElement('div');
+    messageElement.className = `message${isOwn ? ' own' : ''}`;
+    
+    const time = new Date().toLocaleTimeString('tr-TR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+    
+    messageElement.innerHTML = `
+        <div class="message-header">
+            <span class="message-sender">${sender}</span>
+            <span class="message-time">${time}</span>
+        </div>
+        <div class="message-content">${message}</div>
     `;
-    chatMessages.appendChild(messageDiv);
+    
+    chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// ============ User List Functions ============
+function updateUsersList(participants) {
+    const usersList = document.getElementById('usersList');
+    if (!usersList) return;
+    
+    usersList.innerHTML = '';
+    participants.forEach(user => {
+        const userItem = document.createElement('div');
+        userItem.className = 'user-item';
+        userItem.setAttribute('data-user-id', user.id);
+        
+        userItem.innerHTML = `
+            <span class="user-name">${user.name}</span>
+            <div class="user-media-status">
+                <i class="fas fa-video camera-icon ${user.media.video ? 'active' : ''}"></i>
+                <i class="fas fa-microphone mic-icon ${user.media.audio ? 'active' : ''}"></i>
+                ${user.media.screen ? '<i class="fas fa-desktop screen-icon active"></i>' : ''}
+            </div>
+        `;
+        
+        usersList.appendChild(userItem);
+    });
+    
+    // Update participant count
+    const participantCount = document.getElementById('participantCount');
+    if (participantCount) {
+        participantCount.textContent = participants.length;
+    }
 }
 
 // ============ Socket.IO Functions ============
 function initializeSocket() {
-    // Make sure we have a username
     if (!localStorage.getItem('username')) {
         localStorage.setItem('username', currentUser.name);
     }
 
-    // Initialize socket connection
     socket = io(window.location.origin, {
         transports: ['polling', 'websocket'],
         reconnection: true,
@@ -258,59 +343,43 @@ function initializeSocket() {
 
     socket.on('connect', () => {
         console.log('Socket connected');
-        // Join room after connection
         socket.emit('join-room', { 
             roomId, 
-            username: localStorage.getItem('username') || currentUser.name
+            username: localStorage.getItem('username')
         });
         showNotification('Odaya bağlanıldı', 'success');
     });
 
-    socket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-        showNotification('Bağlantı hatası', 'error');
-    });
-
     socket.on('room-joined', (data) => {
-        console.log('Room joined:', data);
+        updateUsersList(data.participants);
         showNotification(`${data.user.name} odaya katıldı`, 'info');
-        updateParticipantCount(data.participants.length);
-        
-        // Update users list
-        const usersList = document.getElementById('usersList');
-        if (usersList) {
-            const userItem = document.createElement('div');
-            userItem.className = 'user-item';
-            userItem.setAttribute('data-user-id', data.user.id);
-            userItem.innerHTML = `
-                <span class="user-name">${data.user.name}</span>
-                <div class="user-media-status">
-                    <i class="fas fa-video camera-icon"></i>
-                    <i class="fas fa-microphone mic-icon"></i>
-                </div>
-            `;
-            usersList.appendChild(userItem);
-        }
     });
 
     socket.on('user-left', (data) => {
-        console.log('User left:', data);
+        updateUsersList(data.participants);
         showNotification(`${data.user.name} odadan ayrıldı`, 'info');
-        updateParticipantCount(data.participants.length);
-        
-        // Remove user from list
-        const userItem = document.querySelector(`[data-user-id="${data.user.id}"]`);
-        if (userItem) {
-            userItem.remove();
+    });
+
+    socket.on('video-state', (data) => {
+        if (data.userId !== socket.id && player) {
+            if (data.state === 'play') {
+                player.seekTo(data.time);
+                player.playVideo();
+            } else if (data.state === 'pause') {
+                player.seekTo(data.time);
+                player.pauseVideo();
+            }
         }
     });
 
-    socket.on('chat-message', (data) => {
-        addMessageToChat(data);
+    socket.on('video-load', (data) => {
+        if (data.userId !== socket.id && player) {
+            player.loadVideoById(data.videoId);
+            document.getElementById('videoOverlay').style.display = 'none';
+        }
     });
 
     socket.on('media-state-change', (data) => {
-        // Update other users' media states
         const userItem = document.querySelector(`[data-user-id="${data.userId}"]`);
         if (userItem) {
             const icon = userItem.querySelector(`.${data.type}-icon`);
@@ -336,7 +405,7 @@ async function searchYouTubeVideos(query, pageToken = '') {
     try {
         if (!query) return null;
         
-        const API_KEY = 'AIzaSyDVhKUC83wcj6Q_3auQVLnjRJFB_HzIom0'; // Replace with your actual API key
+        const API_KEY = 'AIzaSyAXwAfkwgrauvqXAi_Yo4QDRkIYQjVsUIc'; // Replace with your actual API key
         const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}${pageToken ? '&pageToken=' + pageToken : ''}`);
         
         if (!response.ok) {
@@ -386,6 +455,11 @@ function displayVideoResults(videos, append = false) {
                 player.loadVideoById(video.id.videoId);
                 closeVideoModal();
                 document.getElementById('videoOverlay').style.display = 'none';
+                if (socket) {
+                    socket.emit('video-load', {
+                        videoId: video.id.videoId
+                    });
+                }
             }
         });
         
@@ -460,6 +534,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize socket connection
     initializeSocket();
+    initializeChat();
     
     // Set up video overlay and modal
     const videoOverlay = document.getElementById('videoOverlay');
@@ -467,6 +542,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const videoResults = document.getElementById('videoResults');
     const closeVideoModalBtn = document.getElementById('closeVideoModal');
     const modalOverlay = document.getElementById('videoModalOverlay');
+
+    // Set up media control buttons
+    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+    const toggleMicBtn = document.getElementById('toggleMicBtn');
+    const screenShareBtn = document.getElementById('screenShareBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+
+    // Initialize media controls
+    if (toggleCameraBtn) {
+        toggleCameraBtn.addEventListener('click', toggleCamera);
+    }
+
+    if (toggleMicBtn) {
+        toggleMicBtn.addEventListener('click', toggleMicrophone);
+    }
+
+    if (screenShareBtn) {
+        screenShareBtn.addEventListener('click', toggleScreenShare);
+    }
+
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            const modal = document.getElementById('settingsModal');
+            if (modal) modal.style.display = 'block';
+        });
+    }
+
+    if (leaveRoomBtn) {
+        leaveRoomBtn.addEventListener('click', leaveRoom);
+    }
 
     if (videoOverlay) {
         videoOverlay.addEventListener('click', showVideoModal);
@@ -488,49 +594,55 @@ document.addEventListener('DOMContentLoaded', () => {
         modalOverlay.addEventListener('click', closeVideoModal);
     }
 
-    // Prevent modal close when clicking inside
-    const videoSearchModal = document.getElementById('videoSearchModal');
-    if (videoSearchModal) {
-        videoSearchModal.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
-    }
-
-    // Initialize media devices with fallback
+    // Initialize media devices
     initializeMediaDevices();
-
-    console.log('Room initialization complete');
 });
 
 async function initializeMediaDevices() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: true, 
-            audio: true 
-        });
-        
-        localStream = stream;
-        // Start with devices disabled
-        stream.getTracks().forEach(track => track.enabled = false);
-        
-    } catch (error) {
-        console.log('Media device initialization with fallback:', error.name);
-        
-        // Try audio only if video fails
-        if (error.name === 'NotFoundError' || error.name === 'NotAllowedError') {
+        // First try to get both video and audio
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                video: true, 
+                audio: true 
+            });
+        } catch (err) {
+            // If that fails, try to get only audio
             try {
-                const audioStream = await navigator.mediaDevices.getUserMedia({ 
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: false, 
                     audio: true 
                 });
-                localStream = audioStream;
-                audioStream.getTracks().forEach(track => track.enabled = false);
-            } catch (audioError) {
-                console.error('Audio device error:', audioError);
-                showNotification('Mikrofon erişimi sağlanamadı', 'warning');
+            } catch (audioErr) {
+                // If that fails too, try to get only video
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: true, 
+                        audio: false 
+                    });
+                } catch (videoErr) {
+                    // If everything fails, show error
+                    console.error('Media devices error:', err);
+                    showNotification('Medya cihazlarına erişilemedi', 'error');
+                    return;
+                }
             }
-        } else {
-            showNotification('Medya cihazlarına erişim reddedildi', 'warning');
         }
+        
+        // Initially disable both tracks
+        if (localStream.getVideoTracks().length > 0) {
+            localStream.getVideoTracks().forEach(track => track.enabled = false);
+        }
+        if (localStream.getAudioTracks().length > 0) {
+            localStream.getAudioTracks().forEach(track => track.enabled = false);
+        }
+        
+        // Update button states
+        updateMediaButtonStates();
+        
+    } catch (error) {
+        console.error('Media devices error:', error);
+        showNotification('Medya cihazlarına erişilemedi', 'error');
     }
 }
 

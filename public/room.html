@@ -17,7 +17,7 @@
             <!-- Video Bölümü -->
             <div class="video-container">
                 <div id="player"></div>
-                <video id="screenShareVideo" autoplay playsinline></video>
+                <video id="screenShareVideo" style="display: none;" autoplay playsinline></video>
                 <div id="videoOverlay" class="video-overlay">
                     <i class="fas fa-play"></i>
                     <p>Video yüklemek için tıklayın</p>
@@ -25,11 +25,21 @@
             </div>
 
             <!-- Medya Kontrolleri -->
-            <div class="media-controls">
-                <button id="toggleCameraBtn" title="Kamera"><i class="fas fa-video"></i></button>
-                <button id="toggleMicBtn" title="Mikrofon"><i class="fas fa-microphone"></i></button>
-                <button id="screenShareBtn" title="Ekran Paylaşımı"><i class="fas fa-desktop"></i></button>
-                <button id="settingsBtn" title="Ayarlar"><i class="fas fa-cog"></i></button>
+            <div class="controls-container">
+                <div class="media-controls">
+                    <button id="toggleCameraBtn" class="control-btn" title="Kamera">
+                        <i class="fas fa-video"></i>
+                    </button>
+                    <button id="toggleMicBtn" class="control-btn" title="Mikrofon">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button id="screenShareBtn" class="control-btn" title="Ekran Paylaşımı">
+                        <i class="fas fa-desktop"></i>
+                    </button>
+                    <button id="settingsBtn" class="control-btn" title="Ayarlar">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
             </div>
         </div>
 

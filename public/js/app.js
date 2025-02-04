@@ -253,7 +253,142 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    const createRoomBtnNew = document.getElementById('createRoomBtn');
+    const joinRoomBtnNew = document.getElementById('joinRoomBtn');
+    const roomIdInputNew = document.getElementById('roomIdInput');
+    const activeRoomsList = document.getElementById('activeRoomsList');
+
+    if (createRoomBtnNew) {
+        createRoomBtnNew.addEventListener('click', createRoomNew);
+    }
+
+    if (joinRoomBtnNew && roomIdInputNew) {
+        joinRoomBtnNew.addEventListener('click', () => {
+            const roomId = roomIdInputNew.value.trim();
+            if (roomId) {
+                joinRoomNew(roomId);
+            } else {
+                showNotification('Lütfen bir oda ID\'si girin', 'error');
+            }
+        });
+    }
+
+    // Check for username
+    const usernameNew = localStorage.getItem('username');
+    if (!usernameNew) {
+        showUsernameModalNew();
+    }
 });
+
+function initializeSocketNew() {
+    socket = io(window.location.origin, {
+        transports: ['polling', 'websocket']
+    });
+
+    socket.on('connect', () => {
+        console.log('Connected to server');
+        // Request active rooms list
+        socket.emit('get-active-rooms');
+    });
+
+    socket.on('active-rooms', (rooms) => {
+        updateActiveRoomsList(rooms);
+    });
+
+    socket.on('room-created', (roomId) => {
+        window.location.href = `/room.html?roomId=${roomId}`;
+    });
+
+    socket.on('room-joined', (data) => {
+        if (data.success) {
+            window.location.href = `/room.html?roomId=${data.roomId}`;
+        } else {
+            showNotification(data.message || 'Odaya katılırken bir hata oluştu', 'error');
+        }
+    });
+
+    socket.on('error', (error) => {
+        showNotification(error.message || 'Bir hata oluştu', 'error');
+    });
+}
+
+function createRoomNew() {
+    const username = localStorage.getItem('username');
+    if (!username) {
+        showUsernameModalNew(() => {
+            socket.emit('create-room', { username: localStorage.getItem('username') });
+        });
+    } else {
+        socket.emit('create-room', { username });
+    }
+}
+
+function joinRoomNew(roomId) {
+    const username = localStorage.getItem('username');
+    if (!username) {
+        showUsernameModalNew(() => {
+            socket.emit('join-room', { roomId, username: localStorage.getItem('username') });
+        });
+    } else {
+        socket.emit('join-room', { roomId, username });
+    }
+}
+
+function updateActiveRoomsList(rooms) {
+    const activeRoomsList = document.getElementById('activeRoomsList');
+    if (!activeRoomsList) return;
+
+    activeRoomsList.innerHTML = '';
+    
+    if (rooms.length === 0) {
+        activeRoomsList.innerHTML = '<p class="no-rooms">Henüz aktif oda bulunmuyor</p>';
+        return;
+    }
+
+    rooms.forEach(room => {
+        const roomElement = document.createElement('div');
+        roomElement.className = 'room-item';
+        roomElement.innerHTML = `
+            <div class="room-info">
+                <span class="room-id">Oda ID: ${room.id}</span>
+                <span class="participant-count">
+                    <i class="fas fa-users"></i> ${room.participants.length} Katılımcı
+                </span>
+            </div>
+            <button class="join-btn" onclick="joinRoomNew('${room.id}')">
+                <i class="fas fa-sign-in-alt"></i> Katıl
+            </button>
+        `;
+        activeRoomsList.appendChild(roomElement);
+    });
+}
+
+function showUsernameModalNew(callback) {
+    const modal = document.getElementById('usernameModal');
+    const input = document.getElementById('usernameInput');
+    const submitBtn = document.getElementById('submitUsernameBtn');
+
+    if (!modal || !input || !submitBtn) return;
+
+    modal.style.display = 'flex';
+
+    const handleSubmit = () => {
+        const username = input.value.trim();
+        if (username) {
+            localStorage.setItem('username', username);
+            modal.style.display = 'none';
+            if (callback) callback();
+        } else {
+            showNotification('Lütfen bir kullanıcı adı girin', 'error');
+        }
+    };
+
+    submitBtn.onclick = handleSubmit;
+    input.onkeypress = (e) => {
+        if (e.key === 'Enter') handleSubmit();
+    };
+}
 
 // Utility Functions
 function generateRoomId() {

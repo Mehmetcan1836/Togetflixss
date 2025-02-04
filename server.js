@@ -39,6 +39,8 @@ app.use(express.static(path.join(__dirname, 'public'), {
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.css')) {
             res.setHeader('Content-Type', 'text/css');
+        } else if (filePath.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
         }
         // Add cache control for better performance
         res.setHeader('Cache-Control', 'public, max-age=31536000');
