@@ -17,54 +17,36 @@ const configuration = {
 
 // Initialize socket connection
 function initializeSocket() {
-    if (socket && socket.connected) {
-        console.log('Socket already connected');
-        return;
-    }
-
     socket = io(window.location.origin, {
         path: '/socket.io/',
-        transports: ['websocket', 'polling'],
-        upgrade: true,
+        transports: ['polling', 'websocket'],
+        forceNew: true,
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        timeout: 20000,
-        autoConnect: true,
-        forceNew: false
+        timeout: 30000,
+        withCredentials: false,
+        extraHeaders: {
+            'Access-Control-Allow-Origin': '*'
+        }
     });
 
-    // Socket connection events
     socket.on('connect', () => {
         console.log('Connected to server with ID:', socket.id);
         updateConnectionStatus(true);
-        if (roomId) {
-            joinRoom();
-        }
     });
 
     socket.on('connect_error', (error) => {
-        console.error('Connection error:', error);
-        updateConnectionStatus(false);
-        setTimeout(() => {
-            if (!socket.connected) {
-                console.log('Attempting to reconnect...');
-                socket.connect();
-            }
-        }, 2000);
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('Disconnected:', reason);
+        console.error('Socket connection error:', error);
         updateConnectionStatus(false);
         
-        if (reason === 'io server disconnect') {
-            // Sunucu tarafından bağlantı kesildi, yeniden bağlanmayı dene
-            setTimeout(() => {
-                socket.connect();
-            }, 1000);
-        }
+        // Daha detaylı hata yönetimi
+        setTimeout(() => {
+            console.log('Attempting to reconnect with different strategy...');
+            socket.io.opts.transports = ['polling', 'websocket'];
+            socket.connect();
+        }, 2000);
         // Diğer disconnect sebepleri için socket.io otomatik olarak yeniden bağlanmayı deneyecek
     });
 
