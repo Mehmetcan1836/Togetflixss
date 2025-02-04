@@ -3,7 +3,7 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: "*", // Geliştirme aşamasında tüm kaynaklara izin ver
+        origin: ["https://togetflix-mehmetcan1836s-projects.vercel.app", "http://localhost:3000"],
         methods: ["GET", "POST"],
         allowedHeaders: ["my-custom-header"],
         credentials: true
