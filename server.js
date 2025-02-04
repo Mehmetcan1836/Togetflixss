@@ -138,12 +138,25 @@ app.get('*', (req, res) => {
 // Socket connection handling
 io.on('connection', socket => {
     console.log('User connected:', socket.id);
-
+    
     socket.on('join-room', (roomId, userId) => {
         try {
-            console.log('User joining room:', { roomId, userId });
+            console.log('User joining room:', { roomId, userId, socketId: socket.id });
             
-            // Create user if doesn't exist
+            // Leave previous room if any
+            const prevRoom = [...socket.rooms].find(room => room !== socket.id);
+            if (prevRoom) {
+                socket.leave(prevRoom);
+                const room = rooms.get(prevRoom);
+                if (room) {
+                    room.users.delete(userId);
+                    if (room.users.size === 0) {
+                        rooms.delete(prevRoom);
+                    }
+                }
+            }
+
+            // Create user if doesn't exist or update socket id
             if (!users.has(userId)) {
                 users.set(userId, {
                     id: userId,
@@ -153,9 +166,11 @@ io.on('connection', socket => {
                     roomId: roomId,
                     joinedAt: Date.now()
                 });
+            } else {
+                const user = users.get(userId);
+                user.socketId = socket.id;
+                user.roomId = roomId;
             }
-
-            const user = users.get(userId);
 
             // Initialize room if doesn't exist
             if (!rooms.has(roomId)) {
@@ -172,9 +187,6 @@ io.on('connection', socket => {
             room.users.add(userId);
             socket.join(roomId);
 
-            // Broadcast to others in room
-            socket.to(roomId).emit('user-connected', user);
-
             // Send current room state to the new user
             const roomUsers = Array.from(room.users)
                 .map(id => users.get(id))
@@ -185,6 +197,9 @@ io.on('connection', socket => {
                 screenSharer: room.screenSharer,
                 messages: room.messages
             });
+
+            // Broadcast to others in room
+            socket.to(roomId).emit('user-connected', users.get(userId));
 
             // Handle screen sharing
             socket.on('screen-sharing-started', stream => {
@@ -209,7 +224,7 @@ io.on('connection', socket => {
                 const messageObj = {
                     id: Date.now(),
                     userId,
-                    userName: user.name,
+                    userName: users.get(userId).name,
                     message,
                     timestamp: Date.now()
                 };
@@ -233,34 +248,24 @@ io.on('connection', socket => {
     });
 
     socket.on('disconnect', () => {
-        try {
-            console.log('User disconnected:', socket.id);
-            // Find and remove user from their room
-            for (const [roomId, room] of rooms.entries()) {
-                for (const userId of room.users) {
-                    const user = users.get(userId);
-                    if (user && user.socketId === socket.id) {
-                        room.users.delete(userId);
-                        
-                        // Clear screen sharer if disconnected user was sharing
-                        if (room.screenSharer === userId) {
-                            room.screenSharer = null;
-                            io.to(roomId).emit('user-screen-share-stopped', userId);
-                        }
-                        
-                        io.to(roomId).emit('user-disconnected', userId);
-                        users.delete(userId);
-                        
-                        // Clean up empty rooms
-                        if (room.users.size === 0) {
-                            rooms.delete(roomId);
-                        }
-                        break;
+        console.log('User disconnected:', socket.id);
+        
+        // Find and clean up user
+        for (const [userId, user] of users.entries()) {
+            if (user.socketId === socket.id) {
+                const room = rooms.get(user.roomId);
+                if (room) {
+                    room.users.delete(userId);
+                    socket.to(user.roomId).emit('user-disconnected', userId);
+                    
+                    // Clean up empty room
+                    if (room.users.size === 0) {
+                        rooms.delete(user.roomId);
                     }
                 }
+                users.delete(userId);
+                break;
             }
-        } catch (error) {
-            console.error('Error in disconnect:', error);
         }
     });
 });

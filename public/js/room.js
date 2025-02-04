@@ -34,6 +34,14 @@ function initializeSocket() {
         console.error('Socket connection error:', error);
         document.getElementById('status').textContent = 'Connection Error';
         document.getElementById('status').style.color = 'red';
+        
+        // Try to reconnect after a delay
+        setTimeout(() => {
+            if (!socket.connected) {
+                console.log('Attempting to reconnect...');
+                socket.connect();
+            }
+        }, 2000);
     });
 
     socket.on('connect', () => {
@@ -43,16 +51,36 @@ function initializeSocket() {
         
         // Join room after successful connection
         const roomId = window.location.pathname.split('/').pop();
-        socket.emit('join-room', roomId, socket.id);
+        if (roomId) {
+            console.log('Joining room:', roomId);
+            socket.emit('join-room', roomId, socket.id);
+        }
     });
 
     socket.on('disconnect', (reason) => {
         console.log('Disconnected:', reason);
         document.getElementById('status').textContent = 'Disconnected';
         document.getElementById('status').style.color = 'red';
+
+        // Handle reconnection for specific disconnect reasons
+        if (reason === 'io server disconnect' || reason === 'transport close') {
+            setTimeout(() => {
+                if (!socket.connected) {
+                    console.log('Attempting to reconnect after disconnect...');
+                    socket.connect();
+                }
+            }, 1000);
+        }
+    });
+
+    socket.on('error', (error) => {
+        console.error('Socket error:', error);
+        document.getElementById('status').textContent = 'Error: ' + error;
+        document.getElementById('status').style.color = 'red';
     });
 
     // Start the connection
+    console.log('Initializing socket connection...');
     socket.connect();
 
     // Room events
