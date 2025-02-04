@@ -17,6 +17,12 @@ const PORT = process.env.PORT || 3000;
 const rooms = new Map();
 const users = new Map();
 
+// Room permissions
+const PERMISSIONS = {
+    SCREEN_SHARE: 'screenShare',
+    YOUTUBE_CONTROL: 'youtubeControl'
+};
+
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
@@ -27,12 +33,20 @@ app.get('/', (req, res) => {
 });
 
 app.post('/api/rooms', (req, res) => {
-    const roomId = uuidv4().substring(0, 8); // Create shorter room IDs
+    const roomId = uuidv4().substring(0, 8);
     rooms.set(roomId, {
         id: roomId,
         users: new Map(),
         messages: [],
-        created: Date.now()
+        created: Date.now(),
+        moderator: null,
+        youtube: {
+            videoId: null,
+            state: 'paused',
+            timestamp: 0,
+            volume: 100
+        },
+        permissions: new Map() // Store user permissions
     });
     res.json({ roomId });
 });
@@ -44,7 +58,15 @@ app.get('/room/:roomId', (req, res) => {
             id: roomId,
             users: new Map(),
             messages: [],
-            created: Date.now()
+            created: Date.now(),
+            moderator: null,
+            youtube: {
+                videoId: null,
+                state: 'paused',
+                timestamp: 0,
+                volume: 100
+            },
+            permissions: new Map() // Store user permissions
         });
     }
     res.sendFile(path.join(__dirname, 'public', 'room.html'));
@@ -68,7 +90,15 @@ io.on('connection', socket => {
                     id: roomId,
                     users: new Map(),
                     messages: [],
-                    created: Date.now()
+                    created: Date.now(),
+                    moderator: null,
+                    youtube: {
+                        videoId: null,
+                        state: 'paused',
+                        timestamp: 0,
+                        volume: 100
+                    },
+                    permissions: new Map() // Store user permissions
                 });
             }
 
@@ -162,6 +192,47 @@ io.on('connection', socket => {
         } catch (error) {
             console.error('Error handling disconnect:', error);
         }
+    });
+
+    // Permission management
+    socket.on('grantPermission', ({ roomId, userId, permission }) => {
+        const room = rooms.get(roomId);
+        if (!room || room.moderator !== socket.id) return;
+        
+        if (!room.permissions.has(userId)) {
+            room.permissions.set(userId, new Set());
+        }
+        room.permissions.get(userId).add(permission);
+        
+        const targetSocket = io.sockets.sockets.get(userId);
+        if (targetSocket) {
+            targetSocket.emit('permissionGranted', { permission });
+        }
+    });
+
+    socket.on('revokePermission', ({ roomId, userId, permission }) => {
+        const room = rooms.get(roomId);
+        if (!room || room.moderator !== socket.id) return;
+        
+        if (room.permissions.has(userId)) {
+            room.permissions.get(userId).delete(permission);
+        }
+        
+        const targetSocket = io.sockets.sockets.get(userId);
+        if (targetSocket) {
+            targetSocket.emit('permissionRevoked', { permission });
+        }
+    });
+
+    // YouTube sync events
+    socket.on('youtubeVideoUpdate', ({ roomId, videoId, state, timestamp, volume }) => {
+        const room = rooms.get(roomId);
+        if (!room || (room.moderator !== socket.id && 
+            (!room.permissions.has(socket.id) || 
+             !room.permissions.get(socket.id).has(PERMISSIONS.YOUTUBE_CONTROL)))) return;
+        
+        room.youtube = { videoId, state, timestamp, volume };
+        socket.to(roomId).emit('youtubeVideoUpdated', room.youtube);
     });
 });
 

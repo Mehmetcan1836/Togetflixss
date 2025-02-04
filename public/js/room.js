@@ -3,13 +3,16 @@ let currentUser = null;
 let currentRoom = null;
 let isTyping = false;
 let typingTimeout = null;
+let isModerator = false;
+let youtubePlayer = null;
 
 // Socket.IO bağlantısı
 let socket = null;
 
 // DOM elementleri
 let chatMessages, messageInput, videoOverlay, roomIdSpan, userCountSpan, typingIndicator;
-let sendBtn, shareScreenBtn, copyBtn, leaveBtn;
+let sendBtn, shareScreenBtn, copyBtn, leaveBtn, youtubeContainer, youtubeUrlInput, youtubePlayBtn;
+let userList, permissionsModal;
 
 // DOM yüklendikten sonra elementleri al
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,6 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
     shareScreenBtn = document.querySelector('.share-screen-btn');
     copyBtn = document.querySelector('.copy-btn');
     leaveBtn = document.querySelector('.leave-btn');
+    youtubeContainer = document.getElementById('youtubeContainer');
+    youtubeUrlInput = document.getElementById('youtubeUrl');
+    youtubePlayBtn = document.getElementById('youtubePlayBtn');
+    userList = document.getElementById('userList');
+    permissionsModal = document.getElementById('permissionsModal');
 
     socket = io(window.location.hostname === 'localhost' 
         ? 'http://localhost:3000'
@@ -33,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shareScreenBtn) shareScreenBtn.addEventListener('click', startScreenShare);
     if (copyBtn) copyBtn.addEventListener('click', copyRoomLink);
     if (leaveBtn) leaveBtn.addEventListener('click', leaveRoom);
+    if (youtubePlayBtn) youtubePlayBtn.addEventListener('click', handleYoutubeVideo);
     if (messageInput) {
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -216,4 +225,149 @@ function showNotification(message, type = 'info') {
         notification.classList.add('fade-out');
         setTimeout(() => notification.remove(), 500);
     }, 3000);
+}
+
+// Socket events
+socket.on('roomJoined', (data) => {
+    isModerator = data.isModerator;
+    updateUIForRole();
+    
+    if (data.youtube.videoId) {
+        loadYoutubeVideo(data.youtube.videoId, data.youtube.timestamp);
+    }
+});
+
+socket.on('permissionGranted', ({ permission }) => {
+    if (permission === 'screenShare') {
+        shareScreenBtn.disabled = false;
+    } else if (permission === 'youtubeControl') {
+        youtubeUrlInput.disabled = false;
+        youtubePlayBtn.disabled = false;
+    }
+});
+
+socket.on('permissionRevoked', ({ permission }) => {
+    if (permission === 'screenShare') {
+        shareScreenBtn.disabled = true;
+    } else if (permission === 'youtubeControl') {
+        youtubeUrlInput.disabled = true;
+        youtubePlayBtn.disabled = true;
+    }
+});
+
+socket.on('youtubeVideoUpdated', (youtubeState) => {
+    if (!youtubePlayer) {
+        loadYoutubeVideo(youtubeState.videoId, youtubeState.timestamp);
+    } else {
+        updateYoutubePlayer(youtubeState);
+    }
+});
+
+// YouTube işlevleri
+function loadYoutubeVideo(videoId, startTime = 0) {
+    if (!youtubeContainer) return;
+    
+    if (!youtubePlayer) {
+        youtubePlayer = new YT.Player('youtubeContainer', {
+            height: '360',
+            width: '640',
+            videoId: videoId,
+            playerVars: {
+                start: Math.floor(startTime),
+                controls: 1,
+                modestbranding: 1
+            },
+            events: {
+                onStateChange: onYoutubePlayerStateChange,
+                onReady: () => {
+                    youtubePlayer.seekTo(startTime, true);
+                }
+            }
+        });
+    } else {
+        youtubePlayer.loadVideoById({
+            videoId: videoId,
+            startSeconds: startTime
+        });
+    }
+}
+
+function handleYoutubeVideo() {
+    const url = youtubeUrlInput.value;
+    const videoId = extractYoutubeVideoId(url);
+    
+    if (!videoId) {
+        showNotification('Geçerli bir YouTube URL\'si girin', 'error');
+        return;
+    }
+    
+    socket.emit('youtubeVideoUpdate', {
+        roomId: currentRoom,
+        videoId: videoId,
+        state: 'playing',
+        timestamp: 0,
+        volume: 100
+    });
+}
+
+function onYoutubePlayerStateChange(event) {
+    if (!isModerator && !hasPermission('youtubeControl')) return;
+    
+    const states = {
+        '-1': 'unstarted',
+        '0': 'ended',
+        '1': 'playing',
+        '2': 'paused',
+        '3': 'buffering',
+        '5': 'cued'
+    };
+    
+    socket.emit('youtubeVideoUpdate', {
+        roomId: currentRoom,
+        videoId: youtubePlayer.getVideoData().video_id,
+        state: states[event.data],
+        timestamp: youtubePlayer.getCurrentTime(),
+        volume: youtubePlayer.getVolume()
+    });
+}
+
+function updateYoutubePlayer(state) {
+    if (!youtubePlayer) return;
+    
+    if (state.state === 'playing') {
+        youtubePlayer.playVideo();
+    } else if (state.state === 'paused') {
+        youtubePlayer.pauseVideo();
+    }
+    
+    if (Math.abs(youtubePlayer.getCurrentTime() - state.timestamp) > 2) {
+        youtubePlayer.seekTo(state.timestamp, true);
+    }
+    
+    youtubePlayer.setVolume(state.volume);
+}
+
+function extractYoutubeVideoId(url) {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : false;
+}
+
+// UI güncelleme
+function updateUIForRole() {
+    if (isModerator) {
+        shareScreenBtn.disabled = false;
+        youtubeUrlInput.disabled = false;
+        youtubePlayBtn.disabled = false;
+        document.querySelectorAll('.moderator-only').forEach(el => el.style.display = 'block');
+    } else {
+        shareScreenBtn.disabled = true;
+        youtubeUrlInput.disabled = true;
+        youtubePlayBtn.disabled = true;
+        document.querySelectorAll('.moderator-only').forEach(el => el.style.display = 'none');
+    }
+}
+
+function hasPermission(permission) {
+    return isModerator || socket.hasPermission?.(permission);
 }
