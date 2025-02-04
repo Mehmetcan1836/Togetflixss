@@ -3,13 +3,13 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: "*",
+        origin: ["https://togetflix-mehmetcan1836s-projects.vercel.app", "http://localhost:3000"],
         methods: ["GET", "POST"],
-        transports: ['websocket', 'polling'],
+        allowedHeaders: ["my-custom-header"],
         credentials: true
     },
-    allowEIO3: true,
     path: '/socket.io/',
+    allowEIO3: true,
     serveClient: true,
     pingTimeout: 60000,
     pingInterval: 25000,

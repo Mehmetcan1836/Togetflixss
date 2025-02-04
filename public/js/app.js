@@ -7,10 +7,11 @@ function initializeSocket() {
     socket = io(window.location.origin, {
         path: '/socket.io/',
         transports: ['polling', 'websocket'],
-        upgrade: true,
+        forceNew: true,
         reconnection: true,
-        reconnectionAttempts: maxRetries,
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
         timeout: 20000
     });
 
