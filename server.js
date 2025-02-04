@@ -9,17 +9,12 @@ const io = require('socket.io')(http, {
         allowedHeaders: ["*"]
     },
     path: '/socket.io/',
-    transports: ['websocket', 'polling'],
-    allowEIO3: true,
-    pingTimeout: 60000,
-    pingInterval: 25000,
-    upgradeTimeout: 30000,
-    maxHttpBufferSize: 1e8,
-    allowUpgrades: true
+    transports: ['websocket', 'polling']
 });
 
 const path = require('path');
 const PORT = process.env.PORT || 3000;
+const { v4: uuidv4 } = require('uuid');
 
 // Store active rooms and users
 const rooms = new Map();
@@ -123,71 +118,99 @@ app.get('*', (req, res) => {
 
 // Socket.IO connection handling
 io.on('connection', socket => {
-    console.log('User connected:', socket.id);
-    
-    socket.on('join-room', (roomId, userId) => {
+    let currentUser = null;
+    let currentRoom = null;
+
+    socket.on('join-room', ({ roomId, username }) => {
         try {
-            console.log('User joining room:', { roomId, userId });
+            // Generate a unique user ID
+            const userId = uuidv4();
             
-            // Create user if doesn't exist
-            if (!users.has(userId)) {
-                users.set(userId, {
-                    id: userId,
-                    socketId: socket.id,
-                    name: generateUsername(),
-                    roomId: roomId
-                });
-            }
-
-            const user = users.get(userId);
-            user.socketId = socket.id;
-            user.roomId = roomId;
-
-            // Initialize room if doesn't exist
+            // Create user object
+            const user = {
+                id: userId,
+                name: username || generateUsername(),
+                roomId: roomId
+            };
+            
+            // Store user
+            users.set(userId, user);
+            currentUser = user;
+            
+            // Initialize room if it doesn't exist
             if (!rooms.has(roomId)) {
                 rooms.set(roomId, {
                     id: roomId,
-                    users: new Set(),
+                    users: new Map(),
                     messages: []
                 });
             }
-
-            const room = rooms.get(roomId);
-            room.users.add(userId);
+            
+            currentRoom = rooms.get(roomId);
+            currentRoom.users.set(userId, user);
+            
+            // Join socket room
             socket.join(roomId);
-
-            // Send current room state
-            socket.emit('room-state', {
-                users: Array.from(room.users).map(id => users.get(id)),
-                messages: room.messages
+            
+            // Send room state to the user
+            socket.emit('room-joined', {
+                user: user,
+                roomState: {
+                    users: Array.from(currentRoom.users.values()),
+                    messages: currentRoom.messages
+                }
             });
-
-            // Broadcast to others
-            socket.to(roomId).emit('user-connected', users.get(userId));
+            
+            // Notify others
+            socket.to(roomId).emit('user-connected', user);
+            
         } catch (error) {
             console.error('Error joining room:', error);
             socket.emit('error', { message: 'Failed to join room' });
         }
     });
 
+    socket.on('send-message', ({ message }) => {
+        if (!currentUser || !currentRoom) return;
+
+        const messageData = {
+            id: uuidv4(),
+            userId: currentUser.id,
+            username: currentUser.name,
+            content: message,
+            timestamp: Date.now()
+        };
+
+        currentRoom.messages.push(messageData);
+        io.to(currentUser.roomId).emit('chat-message', messageData);
+    });
+
+    socket.on('start-typing', () => {
+        if (!currentUser || !currentRoom) return;
+        socket.to(currentUser.roomId).emit('user-typing', currentUser.id);
+    });
+
+    socket.on('stop-typing', () => {
+        if (!currentUser || !currentRoom) return;
+        socket.to(currentUser.roomId).emit('user-typing-stop', currentUser.id);
+    });
+
     socket.on('disconnect', () => {
         try {
-            console.log('User disconnected:', socket.id);
-            
-            // Find user and room
-            const user = Array.from(users.values()).find(u => u.socketId === socket.id);
-            if (user) {
-                const room = rooms.get(user.roomId);
-                if (room) {
-                    room.users.delete(user.id);
-                    socket.to(user.roomId).emit('user-disconnected', user.id);
-                    
-                    // Clean up empty room
-                    if (room.users.size === 0) {
-                        rooms.delete(user.roomId);
-                    }
+            if (currentUser && currentRoom) {
+                // Remove user from room
+                currentRoom.users.delete(currentUser.id);
+                
+                // Notify others
+                socket.to(currentUser.roomId).emit('user-disconnected', currentUser.id);
+                
+                // Clean up empty room
+                if (currentRoom.users.size === 0) {
+                    rooms.delete(currentRoom.id);
                 }
-                users.delete(user.id);
+                
+                // Remove user
+                users.delete(currentUser.id);
             }
         } catch (error) {
             console.error('Error handling disconnect:', error);
@@ -197,8 +220,8 @@ io.on('connection', socket => {
 
 // Generate random username
 function generateUsername() {
-    const adjectives = ['Happy', 'Lucky', 'Sunny', 'Clever', 'Swift', 'Bright', 'Cool', 'Smart'];
-    const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Lion', 'Fox', 'Wolf', 'Bear'];
+    const adjectives = ['Happy', 'Lucky', 'Sunny', 'Clever', 'Swift'];
+    const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Lion'];
     return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}`;
 }
 
