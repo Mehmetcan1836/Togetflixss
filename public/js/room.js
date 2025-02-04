@@ -1,30 +1,70 @@
 // Global state
-let socket = null;
 let currentUser = null;
 let currentRoom = null;
 let isTyping = false;
 let typingTimeout = null;
 
 // Socket.IO bağlantısı
-const socket = io(window.location.hostname === 'localhost' 
-    ? 'http://localhost:3000'
-    : 'https://togetflix-mehmetcan1836s-projects.vercel.app');
+let socket = null;
 
 // DOM elementleri
-const chatMessages = document.getElementById('chatMessages');
-const messageInput = document.getElementById('messageInput');
-const videoOverlay = document.getElementById('videoOverlay');
-const roomIdSpan = document.querySelector('.room-id');
-const userCountSpan = document.querySelector('.user-count span');
-const typingIndicator = document.querySelector('.typing-indicator');
-const sendBtn = document.querySelector('.send-btn');
-const shareScreenBtn = document.querySelector('.share-screen-btn');
-const copyBtn = document.querySelector('.copy-btn');
-const leaveBtn = document.querySelector('.leave-btn');
+let chatMessages, messageInput, videoOverlay, roomIdSpan, userCountSpan, typingIndicator;
+let sendBtn, shareScreenBtn, copyBtn, leaveBtn;
+
+// DOM yüklendikten sonra elementleri al
+document.addEventListener('DOMContentLoaded', () => {
+    chatMessages = document.getElementById('chatMessages');
+    messageInput = document.getElementById('messageInput');
+    videoOverlay = document.getElementById('videoOverlay');
+    roomIdSpan = document.querySelector('.room-id');
+    userCountSpan = document.querySelector('.user-count span');
+    typingIndicator = document.querySelector('.typing-indicator');
+    sendBtn = document.querySelector('.send-btn');
+    shareScreenBtn = document.querySelector('.share-screen-btn');
+    copyBtn = document.querySelector('.copy-btn');
+    leaveBtn = document.querySelector('.leave-btn');
+
+    socket = io(window.location.hostname === 'localhost' 
+        ? 'http://localhost:3000'
+        : 'https://togetflix-mehmetcan1836s-projects.vercel.app');
+
+    // Event listener'ları ekle
+    if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+    if (shareScreenBtn) shareScreenBtn.addEventListener('click', startScreenShare);
+    if (copyBtn) copyBtn.addEventListener('click', copyRoomLink);
+    if (leaveBtn) leaveBtn.addEventListener('click', leaveRoom);
+    if (messageInput) {
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        messageInput.addEventListener('input', () => {
+            if (!typingTimeout) {
+                socket.emit('typing', { roomId, username });
+            }
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('stopTyping', { roomId, username });
+                typingTimeout = null;
+            }, 1000);
+        });
+    }
+
+    // Oda ID'sini ayarla
+    if (roomIdSpan) {
+        roomIdSpan.textContent = `Room ID: ${roomId}`;
+    }
+
+    // Odaya katıl
+    socket.emit('joinRoom', { roomId, username });
+});
 
 // Oda ID'sini URL'den al
 const roomId = window.location.pathname.split('/').pop();
-roomIdSpan.textContent = `Room ID: ${roomId}`;
 
 // Kullanıcı adını localStorage'dan al veya oluştur
 let username = localStorage.getItem('username');
@@ -32,9 +72,6 @@ if (!username) {
     username = 'User_' + Math.random().toString(36).substr(2, 6);
     localStorage.setItem('username', username);
 }
-
-// Odaya katıl
-socket.emit('joinRoom', { roomId, username });
 
 // Bağlantı durumu
 socket.on('connect', () => {
@@ -47,11 +84,15 @@ socket.on('disconnect', () => {
 
 // Kullanıcı sayısını güncelle
 socket.on('userCount', (count) => {
-    userCountSpan.textContent = count;
+    if (userCountSpan) {
+        userCountSpan.textContent = count;
+    }
 });
 
 // Mesaj gönderme işlevi
 function sendMessage() {
+    if (!messageInput) return;
+    
     const message = messageInput.value.trim();
     if (message) {
         socket.emit('chatMessage', {
@@ -64,19 +105,6 @@ function sendMessage() {
     }
 }
 
-// Enter tuşu ile mesaj gönderme
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
-
-// Send butonu ile mesaj gönderme
-if (sendBtn) {
-    sendBtn.addEventListener('click', sendMessage);
-}
-
 // Mesaj alma
 socket.on('chatMessage', (data) => {
     appendMessage(data);
@@ -84,6 +112,8 @@ socket.on('chatMessage', (data) => {
 
 // Mesajı sohbete ekle
 function appendMessage(data) {
+    if (!chatMessages) return;
+
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${data.username === username ? 'own-message' : ''}`;
     
@@ -101,20 +131,9 @@ function appendMessage(data) {
 }
 
 // Yazıyor göstergesi
-let typingTimeout;
-messageInput.addEventListener('input', () => {
-    if (!typingTimeout) {
-        socket.emit('typing', { roomId, username });
-    }
-    
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-        socket.emit('stopTyping', { roomId, username });
-        typingTimeout = null;
-    }, 1000);
-});
-
 socket.on('typing', (data) => {
+    if (!typingIndicator) return;
+    
     if (data.username !== username) {
         typingIndicator.textContent = `${data.username} is typing...`;
         typingIndicator.style.display = 'block';
@@ -122,11 +141,14 @@ socket.on('typing', (data) => {
 });
 
 socket.on('stopTyping', () => {
+    if (!typingIndicator) return;
     typingIndicator.style.display = 'none';
 });
 
 // Ekran paylaşımı
 async function startScreenShare() {
+    if (!videoOverlay || !player) return;
+
     try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
             video: true,
@@ -136,7 +158,7 @@ async function startScreenShare() {
         const video = document.createElement('video');
         video.srcObject = stream;
         video.autoplay = true;
-        video.controls = true; // Video kontrollerini ekle
+        video.controls = true;
         
         const player = document.getElementById('player');
         player.innerHTML = '';
@@ -159,11 +181,6 @@ async function startScreenShare() {
     }
 }
 
-// Ekran paylaşma butonu
-if (shareScreenBtn) {
-    shareScreenBtn.addEventListener('click', startScreenShare);
-}
-
 // Oda linkini kopyala
 function copyRoomLink() {
     const roomLink = window.location.href;
@@ -172,20 +189,10 @@ function copyRoomLink() {
         .catch(() => showNotification('Failed to copy room link', 'error'));
 }
 
-// Oda linkini kopyalama butonu
-if (copyBtn) {
-    copyBtn.addEventListener('click', copyRoomLink);
-}
-
 // Odadan ayrıl
 function leaveRoom() {
     socket.emit('leaveRoom', { roomId, username });
     window.location.href = '/';
-}
-
-// Odadan ayrılma butonu
-if (leaveBtn) {
-    leaveBtn.addEventListener('click', leaveRoom);
 }
 
 // Yardımcı fonksiyonlar
@@ -196,11 +203,13 @@ function formatTimestamp(timestamp) {
 
 // Bildirim göster
 function showNotification(message, type = 'info') {
+    const container = document.querySelector('.notification-container');
+    if (!container) return;
+
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
     
-    const container = document.querySelector('.notification-container');
     container.appendChild(notification);
     
     setTimeout(() => {
