@@ -15,7 +15,7 @@ const io = require('socket.io')(http, {
     pingInterval: 25000,
     upgradeTimeout: 30000,
     maxHttpBufferSize: 1e8,
-    transports: ['polling', 'websocket'],
+    transports: ['websocket', 'polling'],
     connectTimeout: 45000,
     cleanupEmptyChildNamespaces: true
 });
