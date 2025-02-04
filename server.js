@@ -3,7 +3,7 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: ["https://togetflix-mehmetcan1836s-projects.vercel.app", "http://localhost:3000"],
+        origin: "*", // Geliştirme aşamasında tüm kaynaklara izin ver
         methods: ["GET", "POST"],
         allowedHeaders: ["my-custom-header"],
         credentials: true
@@ -15,7 +15,7 @@ const io = require('socket.io')(http, {
     pingInterval: 25000,
     upgradeTimeout: 30000,
     maxHttpBufferSize: 1e8,
-    transports: ['websocket', 'polling'],
+    transports: ['polling', 'websocket'],
     connectTimeout: 45000,
     cleanupEmptyChildNamespaces: true
 });
