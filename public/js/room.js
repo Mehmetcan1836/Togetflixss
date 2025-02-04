@@ -18,140 +18,148 @@ const configuration = {
 // Initialize socket connection
 function initializeSocket() {
     const roomId = window.location.pathname.split('/').pop();
+    const socketUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3000'
+        : 'https://togetflix-mehmetcan1836s-projects.vercel.app';
+
     const socketOptions = {
         path: '/socket.io/',
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 10000,
+        reconnectionDelayMax: 5000,
         timeout: 20000,
         autoConnect: true,
-        query: { roomId }
+        forceNew: true
     };
 
-    socket = io(window.location.origin, socketOptions);
+    try {
+        socket = io(socketUrl, socketOptions);
 
-    socket.on('connect_error', (error) => {
-        console.error('Socket connection error:', error);
-        updateConnectionStatus(false);
-        
-        // Try to reconnect with exponential backoff
-        const retryDelay = Math.min(1000 * Math.pow(2, socket.reconnectionAttempts || 0), 10000);
-        setTimeout(() => {
-            if (!socket.connected) {
-                console.log(`Attempting to reconnect in ${retryDelay}ms...`);
-                socket.connect();
-            }
-        }, retryDelay);
-    });
-
-    socket.on('connect', () => {
-        console.log('Connected to server with ID:', socket.id);
-        updateConnectionStatus(true);
-        
-        // Join room after successful connection
-        const userId = generateUserId();
-        socket.emit('join-room', userId);
-    });
-
-    socket.on('disconnect', (reason) => {
-        console.log('Disconnected:', reason);
-        updateConnectionStatus(false);
-        
-        // Attempt to reconnect on certain disconnect reasons
-        if (reason === 'io server disconnect' || reason === 'transport close') {
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+            updateConnectionStatus(false);
+            
+            // Try to reconnect with exponential backoff
+            const retryDelay = Math.min(1000 * Math.pow(2, socket.reconnectionAttempts || 0), 5000);
             setTimeout(() => {
                 if (!socket.connected) {
+                    console.log(`Attempting to reconnect in ${retryDelay}ms...`);
                     socket.connect();
                 }
-            }, 1000);
-        }
-    });
-
-    socket.on('error', (error) => {
-        console.error('Socket error:', error);
-        document.getElementById('status').textContent = 'Error: ' + error;
-        document.getElementById('status').style.color = 'red';
-    });
-
-    // Room events
-    socket.on('user-connected', async (user) => {
-        console.log('User connected:', user);
-        addUserToList(user);
-        
-        // If we are currently sharing screen, send it to the new user
-        if (isScreenSharing && screenStream) {
-            const pc = createPeerConnection(user.id);
-            screenStream.getTracks().forEach(track => {
-                pc.addTrack(track, screenStream);
-            });
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socket.emit('offer', {
-                targetId: user.id,
-                offer: offer
-            });
-        }
-    });
-
-    socket.on('user-disconnected', (userId) => {
-        console.log('User disconnected:', userId);
-        removeUserFromList(userId);
-        closePeerConnection(userId);
-    });
-
-    socket.on('room-state', (state) => {
-        console.log('Room state:', state);
-        updateRoomState(state);
-    });
-
-    // WebRTC events
-    socket.on('offer', async ({ senderId, offer }) => {
-        console.log('Received offer from:', senderId);
-        const pc = createPeerConnection(senderId);
-        await pc.setRemoteDescription(new RTCSessionDescription(offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('answer', {
-            targetId: senderId,
-            answer: answer
+            }, retryDelay);
         });
-    });
 
-    socket.on('answer', async ({ senderId, answer }) => {
-        console.log('Received answer from:', senderId);
-        const pc = peerConnections[senderId];
-        if (pc) {
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        }
-    });
+        socket.on('connect', () => {
+            console.log('Connected to server with ID:', socket.id);
+            updateConnectionStatus(true);
+            
+            if (roomId) {
+                const userId = generateUserId();
+                console.log('Joining room:', roomId, 'with user ID:', userId);
+                socket.emit('join-room', roomId, userId);
+            }
+        });
 
-    socket.on('ice-candidate', async ({ senderId, candidate }) => {
-        console.log('Received ICE candidate from:', senderId);
-        const pc = peerConnections[senderId];
-        if (pc) {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        }
-    });
+        socket.on('error', (error) => {
+            console.error('Socket error:', error);
+            updateConnectionStatus(false);
+        });
 
-    // Chat events
-    socket.on('chat-message', (message) => {
-        console.log('Chat message:', message);
-        addChatMessage(message);
-    });
+        socket.on('disconnect', (reason) => {
+            console.log('Disconnected:', reason);
+            updateConnectionStatus(false);
+        });
 
-    socket.on('user-typing', (userId) => {
-        showTypingIndicator(userId);
-    });
+        // Room events
+        socket.on('user-connected', (user) => {
+            console.log('User connected to room:', user);
+            addUserToList(user);
+            
+            // If we are currently sharing screen, send it to the new user
+            if (isScreenSharing && screenStream) {
+                const pc = createPeerConnection(user.id);
+                screenStream.getTracks().forEach(track => {
+                    pc.addTrack(track, screenStream);
+                });
+                const offer = pc.createOffer();
+                pc.setLocalDescription(offer);
+                socket.emit('offer', {
+                    targetId: user.id,
+                    offer: offer
+                });
+            }
+        });
 
-    socket.on('user-typing-stop', (userId) => {
-        hideTypingIndicator(userId);
-    });
+        socket.on('user-disconnected', (userId) => {
+            console.log('User disconnected from room:', userId);
+            removeUserFromList(userId);
+            closePeerConnection(userId);
+        });
 
-    // Start the connection
-    console.log('Initializing socket connection...');
-    socket.connect();
+        socket.on('room-state', (state) => {
+            console.log('Received room state:', state);
+            updateRoomState(state);
+        });
+
+        // WebRTC events
+        socket.on('offer', async ({ senderId, offer }) => {
+            console.log('Received offer from:', senderId);
+            const pc = createPeerConnection(senderId);
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit('answer', {
+                targetId: senderId,
+                answer: answer
+            });
+        });
+
+        socket.on('answer', async ({ senderId, answer }) => {
+            console.log('Received answer from:', senderId);
+            const pc = peerConnections[senderId];
+            if (pc) {
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            }
+        });
+
+        socket.on('ice-candidate', async ({ senderId, candidate }) => {
+            console.log('Received ICE candidate from:', senderId);
+            const pc = peerConnections[senderId];
+            if (pc) {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+        });
+
+        // Chat events
+        socket.on('chat-message', (message) => {
+            console.log('Received chat message:', message);
+            addChatMessage(message);
+        });
+
+        socket.on('user-typing', (userId) => {
+            showTypingIndicator(userId);
+        });
+
+        socket.on('user-typing-stop', (userId) => {
+            hideTypingIndicator(userId);
+        });
+
+        console.log('Socket initialization complete');
+    } catch (error) {
+        console.error('Error initializing socket:', error);
+        updateConnectionStatus(false);
+    }
+}
+
+// Update connection status UI
+function updateConnectionStatus(connected) {
+    const statusElement = document.getElementById('status');
+    if (statusElement) {
+        statusElement.textContent = connected ? 'Connected' : 'Disconnected';
+        statusElement.style.color = connected ? 'green' : 'red';
+    }
 }
 
 // WebRTC functions
@@ -282,19 +290,6 @@ function stopScreenShare() {
 }
 
 // UI functions
-function updateConnectionStatus(connected) {
-    const status = document.getElementById('status');
-    const indicator = document.getElementById('statusIndicator');
-    
-    if (connected) {
-        status.textContent = 'Connected';
-        indicator.classList.add('connected');
-    } else {
-        status.textContent = 'Disconnected';
-        indicator.classList.remove('connected');
-    }
-}
-
 function addUserToList(user) {
     const usersList = document.getElementById('usersList');
     if (!usersList) return;

@@ -4,38 +4,18 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST", "OPTIONS"],
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         credentials: true,
         allowedHeaders: ["*"]
     },
-    allowEIO3: true,
     path: '/socket.io/',
-    serveClient: true,
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000,
     upgradeTimeout: 30000,
     maxHttpBufferSize: 1e8,
-    transports: ['websocket', 'polling'],
-    allowUpgrades: true,
-    perMessageDeflate: {
-        threshold: 1024
-    },
-    cookie: {
-        name: 'io',
-        httpOnly: true,
-        sameSite: 'lax'
-    }
-});
-
-// Middleware for parsing roomId from handshake
-io.use((socket, next) => {
-    const roomId = socket.handshake.query.roomId;
-    if (roomId) {
-        socket.roomId = roomId;
-        next();
-    } else {
-        next(new Error('Room ID not provided'));
-    }
+    allowUpgrades: true
 });
 
 const path = require('path');
@@ -61,13 +41,6 @@ app.use((req, res, next) => {
     }
     next();
 });
-
-// Generate random username
-function generateUsername() {
-    const adjectives = ['Happy', 'Lucky', 'Sunny', 'Clever', 'Swift', 'Bright', 'Cool', 'Smart'];
-    const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Lion', 'Fox', 'Wolf', 'Bear'];
-    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}`;
-}
 
 // API Routes
 app.post('/api/rooms', (req, res) => {
@@ -148,13 +121,13 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', req.path));
 });
 
-// Socket connection handling
+// Socket.IO connection handling
 io.on('connection', socket => {
     console.log('User connected:', socket.id);
     
-    socket.on('join-room', (userId) => {
+    socket.on('join-room', (roomId, userId) => {
         try {
-            console.log('User joining room:', { roomId: socket.roomId, userId });
+            console.log('User joining room:', { roomId, userId });
             
             // Create user if doesn't exist
             if (!users.has(userId)) {
@@ -162,26 +135,26 @@ io.on('connection', socket => {
                     id: userId,
                     socketId: socket.id,
                     name: generateUsername(),
-                    roomId: socket.roomId
+                    roomId: roomId
                 });
             }
 
             const user = users.get(userId);
             user.socketId = socket.id;
-            user.roomId = socket.roomId;
+            user.roomId = roomId;
 
             // Initialize room if doesn't exist
-            if (!rooms.has(socket.roomId)) {
-                rooms.set(socket.roomId, {
-                    id: socket.roomId,
+            if (!rooms.has(roomId)) {
+                rooms.set(roomId, {
+                    id: roomId,
                     users: new Set(),
                     messages: []
                 });
             }
 
-            const room = rooms.get(socket.roomId);
+            const room = rooms.get(roomId);
             room.users.add(userId);
-            socket.join(socket.roomId);
+            socket.join(roomId);
 
             // Send current room state
             socket.emit('room-state', {
@@ -190,33 +163,44 @@ io.on('connection', socket => {
             });
 
             // Broadcast to others
-            socket.to(socket.roomId).emit('user-connected', user);
+            socket.to(roomId).emit('user-connected', users.get(userId));
         } catch (error) {
             console.error('Error joining room:', error);
+            socket.emit('error', { message: 'Failed to join room' });
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        
-        // Find and clean up user
-        for (const [userId, user] of users.entries()) {
-            if (user.socketId === socket.id) {
+        try {
+            console.log('User disconnected:', socket.id);
+            
+            // Find user and room
+            const user = Array.from(users.values()).find(u => u.socketId === socket.id);
+            if (user) {
                 const room = rooms.get(user.roomId);
                 if (room) {
-                    room.users.delete(userId);
-                    socket.to(user.roomId).emit('user-disconnected', userId);
+                    room.users.delete(user.id);
+                    socket.to(user.roomId).emit('user-disconnected', user.id);
                     
+                    // Clean up empty room
                     if (room.users.size === 0) {
                         rooms.delete(user.roomId);
                     }
                 }
-                users.delete(userId);
-                break;
+                users.delete(user.id);
             }
+        } catch (error) {
+            console.error('Error handling disconnect:', error);
         }
     });
 });
+
+// Generate random username
+function generateUsername() {
+    const adjectives = ['Happy', 'Lucky', 'Sunny', 'Clever', 'Swift', 'Bright', 'Cool', 'Smart'];
+    const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Lion', 'Fox', 'Wolf', 'Bear'];
+    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}`;
+}
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -224,6 +208,16 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error' });
 });
 
-http.listen(PORT, () => {
+// Start server
+const server = http.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+// Handle server shutdown
+process.on('SIGTERM', () => {
+    server.close(() => {
+        console.log('Server shut down');
+    });
+});
+
+module.exports = app;

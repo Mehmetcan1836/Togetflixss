@@ -13,15 +13,18 @@
   "routes": [
     {
       "src": "/socket.io/(.*)",
-      "dest": "/server.js"
+      "dest": "server.js"
     },
     {
       "src": "/api/(.*)",
-      "dest": "/server.js"
+      "dest": "server.js"
     },
     {
       "src": "/room/(.*)",
-      "dest": "/server.js"
+      "dest": "server.js"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
@@ -43,6 +46,10 @@
         {
           "key": "Access-Control-Allow-Headers",
           "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
         }
       ]
     }
