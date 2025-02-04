@@ -3,18 +3,39 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: ["https://togetflix-mehmetcan1836s-projects.vercel.app", "http://localhost:3000"],
+        origin: "*",
         methods: ["GET", "POST", "OPTIONS"],
         credentials: true,
         allowedHeaders: ["*"]
     },
-    transports: ['polling', 'websocket'],
+    allowEIO3: true,
     path: '/socket.io/',
+    serveClient: true,
     pingTimeout: 60000,
     pingInterval: 25000,
-    reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000
+    upgradeTimeout: 30000,
+    maxHttpBufferSize: 1e8,
+    transports: ['websocket', 'polling'],
+    allowUpgrades: true,
+    perMessageDeflate: {
+        threshold: 1024
+    },
+    cookie: {
+        name: 'io',
+        httpOnly: true,
+        sameSite: 'lax'
+    }
+});
+
+// Middleware for parsing roomId from handshake
+io.use((socket, next) => {
+    const roomId = socket.handshake.query.roomId;
+    if (roomId) {
+        socket.roomId = roomId;
+        next();
+    } else {
+        next(new Error('Room ID not provided'));
+    }
 });
 
 const path = require('path');
@@ -131,9 +152,9 @@ app.get('*', (req, res) => {
 io.on('connection', socket => {
     console.log('User connected:', socket.id);
     
-    socket.on('join-room', (roomId, userId) => {
+    socket.on('join-room', (userId) => {
         try {
-            console.log('User joining room:', { roomId, userId });
+            console.log('User joining room:', { roomId: socket.roomId, userId });
             
             // Create user if doesn't exist
             if (!users.has(userId)) {
@@ -141,26 +162,26 @@ io.on('connection', socket => {
                     id: userId,
                     socketId: socket.id,
                     name: generateUsername(),
-                    roomId: roomId
+                    roomId: socket.roomId
                 });
             }
 
             const user = users.get(userId);
             user.socketId = socket.id;
-            user.roomId = roomId;
+            user.roomId = socket.roomId;
 
             // Initialize room if doesn't exist
-            if (!rooms.has(roomId)) {
-                rooms.set(roomId, {
-                    id: roomId,
+            if (!rooms.has(socket.roomId)) {
+                rooms.set(socket.roomId, {
+                    id: socket.roomId,
                     users: new Set(),
                     messages: []
                 });
             }
 
-            const room = rooms.get(roomId);
+            const room = rooms.get(socket.roomId);
             room.users.add(userId);
-            socket.join(roomId);
+            socket.join(socket.roomId);
 
             // Send current room state
             socket.emit('room-state', {
@@ -169,7 +190,7 @@ io.on('connection', socket => {
             });
 
             // Broadcast to others
-            socket.to(roomId).emit('user-connected', user);
+            socket.to(socket.roomId).emit('user-connected', user);
         } catch (error) {
             console.error('Error joining room:', error);
         }

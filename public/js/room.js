@@ -17,30 +17,30 @@ const configuration = {
 
 // Initialize socket connection
 function initializeSocket() {
+    const roomId = window.location.pathname.split('/').pop();
     const socketOptions = {
-        path: '/socket.io',
-        transports: ['polling', 'websocket'],
+        path: '/socket.io/',
+        transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 60000,
+        reconnectionDelayMax: 10000,
+        timeout: 20000,
         autoConnect: true,
-        forceNew: true
+        query: { roomId }
     };
 
-    socket = io(window.location.origin.replace(/^http/, 'ws'), socketOptions);
+    socket = io(window.location.origin, socketOptions);
 
     socket.on('connect_error', (error) => {
         console.error('Socket connection error:', error);
-        document.getElementById('status').textContent = 'Connection Error';
-        document.getElementById('status').style.color = 'red';
+        updateConnectionStatus(false);
         
-        // Try to reconnect after a delay with exponential backoff
-        const retryDelay = Math.min(1000 * Math.pow(2, socket.reconnectionAttempts), 10000);
+        // Try to reconnect with exponential backoff
+        const retryDelay = Math.min(1000 * Math.pow(2, socket.reconnectionAttempts || 0), 10000);
         setTimeout(() => {
             if (!socket.connected) {
-                console.log('Attempting to reconnect...');
+                console.log(`Attempting to reconnect in ${retryDelay}ms...`);
                 socket.connect();
             }
         }, retryDelay);
@@ -48,27 +48,21 @@ function initializeSocket() {
 
     socket.on('connect', () => {
         console.log('Connected to server with ID:', socket.id);
-        document.getElementById('status').textContent = 'Connected';
-        document.getElementById('status').style.color = 'green';
+        updateConnectionStatus(true);
         
         // Join room after successful connection
-        const roomId = window.location.pathname.split('/').pop();
-        if (roomId) {
-            console.log('Joining room:', roomId);
-            socket.emit('join-room', roomId, socket.id);
-        }
+        const userId = generateUserId();
+        socket.emit('join-room', userId);
     });
 
     socket.on('disconnect', (reason) => {
         console.log('Disconnected:', reason);
-        document.getElementById('status').textContent = 'Disconnected';
-        document.getElementById('status').style.color = 'red';
-
-        // Handle reconnection for specific disconnect reasons
+        updateConnectionStatus(false);
+        
+        // Attempt to reconnect on certain disconnect reasons
         if (reason === 'io server disconnect' || reason === 'transport close') {
             setTimeout(() => {
                 if (!socket.connected) {
-                    console.log('Attempting to reconnect after disconnect...');
                     socket.connect();
                 }
             }, 1000);
@@ -80,10 +74,6 @@ function initializeSocket() {
         document.getElementById('status').textContent = 'Error: ' + error;
         document.getElementById('status').style.color = 'red';
     });
-
-    // Start the connection
-    console.log('Initializing socket connection...');
-    socket.connect();
 
     // Room events
     socket.on('user-connected', async (user) => {
@@ -158,6 +148,10 @@ function initializeSocket() {
     socket.on('user-typing-stop', (userId) => {
         hideTypingIndicator(userId);
     });
+
+    // Start the connection
+    console.log('Initializing socket connection...');
+    socket.connect();
 }
 
 // WebRTC functions
