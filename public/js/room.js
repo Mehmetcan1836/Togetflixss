@@ -21,9 +21,14 @@ function initializeSocket() {
         path: '/socket.io/',
         transports: ['polling', 'websocket'],
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
-        timeout: 20000
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        autoConnect: true,
+        query: {
+            roomId: window.location.pathname.split('/').pop()
+        }
     });
 
     socket.on('connect', () => {
