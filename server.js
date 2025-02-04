@@ -14,7 +14,10 @@ const io = require('socket.io')(http, {
     pingTimeout: 60000,
     pingInterval: 25000,
     upgradeTimeout: 30000,
-    maxHttpBufferSize: 1e8
+    maxHttpBufferSize: 1e8,
+    transports: ['websocket', 'polling'],
+    connectTimeout: 45000,
+    cleanupEmptyChildNamespaces: true
 });
 
 const path = require('path');

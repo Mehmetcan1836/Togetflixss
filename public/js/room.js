@@ -17,31 +17,55 @@ const configuration = {
 
 // Initialize socket connection
 function initializeSocket() {
+    if (socket && socket.connected) {
+        console.log('Socket already connected');
+        return;
+    }
+
     socket = io(window.location.origin, {
         path: '/socket.io/',
-        transports: ['polling', 'websocket'],
+        transports: ['websocket', 'polling'],
         upgrade: true,
         reconnection: true,
-        reconnectionAttempts: 3,
+        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
-        timeout: 20000
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        autoConnect: true,
+        forceNew: false
     });
 
     // Socket connection events
     socket.on('connect', () => {
-        console.log('Connected to server');
+        console.log('Connected to server with ID:', socket.id);
         updateConnectionStatus(true);
-        joinRoom();
+        if (roomId) {
+            joinRoom();
+        }
     });
 
     socket.on('connect_error', (error) => {
         console.error('Connection error:', error);
         updateConnectionStatus(false);
+        setTimeout(() => {
+            if (!socket.connected) {
+                console.log('Attempting to reconnect...');
+                socket.connect();
+            }
+        }, 2000);
     });
 
     socket.on('disconnect', (reason) => {
         console.log('Disconnected:', reason);
         updateConnectionStatus(false);
+        
+        if (reason === 'io server disconnect') {
+            // Sunucu tarafından bağlantı kesildi, yeniden bağlanmayı dene
+            setTimeout(() => {
+                socket.connect();
+            }, 1000);
+        }
+        // Diğer disconnect sebepleri için socket.io otomatik olarak yeniden bağlanmayı deneyecek
     });
 
     // Room events
