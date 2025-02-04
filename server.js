@@ -54,7 +54,7 @@ app.post('/api/rooms', (req, res) => {
             timestamp: 0,
             volume: 100
         },
-        permissions: new Map() // Store user permissions
+        permissions: new Map()
     });
     res.json({ roomId });
 });
@@ -74,7 +74,7 @@ app.get('/room/:roomId', (req, res) => {
                 timestamp: 0,
                 volume: 100
             },
-            permissions: new Map() // Store user permissions
+            permissions: new Map()
         });
     }
     res.sendFile(path.join(__dirname, 'public', 'room.html'));
@@ -106,170 +106,114 @@ io.on('connection', socket => {
                         timestamp: 0,
                         volume: 100
                     },
-                    permissions: new Map() // Store user permissions
+                    permissions: new Map()
                 });
             }
 
-            currentRoom = rooms.get(roomId);
+            const room = rooms.get(roomId);
 
-            // Create user
-            const userId = uuidv4();
+            // Create user object
             currentUser = {
-                id: userId,
-                name: username || generateUsername(),
-                roomId: roomId,
-                joinedAt: Date.now()
+                id: socket.id,
+                name: username,
+                media: {
+                    video: false,
+                    audio: false,
+                    screen: false
+                }
             };
 
             // Add user to room
-            currentRoom.users.set(userId, currentUser);
-            users.set(userId, currentUser);
+            room.users.set(socket.id, currentUser);
+            currentRoom = room;
 
             // Join socket room
-            await socket.join(roomId);
+            socket.join(roomId);
 
-            // Send room state to the user
-            socket.emit('room-joined', {
+            // Notify all users in room
+            io.to(roomId).emit('room-joined', {
                 user: currentUser,
-                roomState: {
-                    id: roomId,
-                    users: Array.from(currentRoom.users.values()),
-                    messages: currentRoom.messages
-                }
+                participants: Array.from(room.users.values())
             });
 
-            // Notify others
-            socket.to(roomId).emit('user-connected', currentUser);
-
-            // Clean up inactive rooms periodically
-            cleanupInactiveRooms();
-
+            // Send room state to new user
+            socket.emit('room-state', {
+                youtube: room.youtube,
+                participants: Array.from(room.users.values()),
+                messages: room.messages
+            });
         } catch (error) {
-            console.error('Error joining room:', error);
+            console.error('Join room error:', error);
             socket.emit('error', { message: 'Failed to join room' });
         }
     });
 
-    socket.on('send-message', ({ message }) => {
-        if (!currentUser || !currentRoom) {
-            socket.emit('error', { message: 'Not in a room' });
-            return;
-        }
-
-        const messageData = {
-            id: uuidv4(),
-            userId: currentUser.id,
-            username: currentUser.name,
-            content: message,
-            timestamp: Date.now()
-        };
-
-        currentRoom.messages.push(messageData);
-        io.to(currentUser.roomId).emit('chat-message', messageData);
-    });
-
-    socket.on('start-typing', () => {
+    socket.on('chat-message', (message) => {
         if (currentUser && currentRoom) {
-            socket.to(currentUser.roomId).emit('user-typing', currentUser.id);
+            const messageData = {
+                user: currentUser,
+                message,
+                timestamp: Date.now()
+            };
+            currentRoom.messages.push(messageData);
+            io.to(currentRoom.id).emit('chat-message', messageData);
         }
     });
 
-    socket.on('stop-typing', () => {
+    socket.on('media-state-change', (data) => {
         if (currentUser && currentRoom) {
-            socket.to(currentUser.roomId).emit('user-typing-stop', currentUser.id);
+            currentUser.media[data.type] = data.enabled;
+            io.to(currentRoom.id).emit('media-state-change', {
+                userId: currentUser.id,
+                type: data.type,
+                enabled: data.enabled
+            });
         }
     });
 
     socket.on('disconnect', () => {
-        try {
-            if (currentUser && currentRoom) {
-                // Remove user from room
-                currentRoom.users.delete(currentUser.id);
-                
-                // Notify others
-                socket.to(currentUser.roomId).emit('user-disconnected', currentUser.id);
-                
-                // Clean up empty room
-                if (currentRoom.users.size === 0) {
-                    rooms.delete(currentRoom.id);
-                }
-                
-                // Remove user
-                users.delete(currentUser.id);
+        if (currentUser && currentRoom) {
+            // Remove user from room
+            currentRoom.users.delete(socket.id);
+            
+            // Notify others
+            io.to(currentRoom.id).emit('user-left', {
+                user: currentUser,
+                participants: Array.from(currentRoom.users.values())
+            });
+
+            // Clean up empty room
+            if (currentRoom.users.size === 0) {
+                rooms.delete(currentRoom.id);
             }
-        } catch (error) {
-            console.error('Error handling disconnect:', error);
         }
-    });
-
-    // Permission management
-    socket.on('grantPermission', ({ roomId, userId, permission }) => {
-        const room = rooms.get(roomId);
-        if (!room || room.moderator !== socket.id) return;
-        
-        if (!room.permissions.has(userId)) {
-            room.permissions.set(userId, new Set());
-        }
-        room.permissions.get(userId).add(permission);
-        
-        const targetSocket = io.sockets.sockets.get(userId);
-        if (targetSocket) {
-            targetSocket.emit('permissionGranted', { permission });
-        }
-    });
-
-    socket.on('revokePermission', ({ roomId, userId, permission }) => {
-        const room = rooms.get(roomId);
-        if (!room || room.moderator !== socket.id) return;
-        
-        if (room.permissions.has(userId)) {
-            room.permissions.get(userId).delete(permission);
-        }
-        
-        const targetSocket = io.sockets.sockets.get(userId);
-        if (targetSocket) {
-            targetSocket.emit('permissionRevoked', { permission });
-        }
-    });
-
-    // YouTube sync events
-    socket.on('youtubeVideoUpdate', ({ roomId, videoId, state, timestamp, volume }) => {
-        const room = rooms.get(roomId);
-        if (!room || (room.moderator !== socket.id && 
-            (!room.permissions.has(socket.id) || 
-             !room.permissions.get(socket.id).has(PERMISSIONS.YOUTUBE_CONTROL)))) return;
-        
-        room.youtube = { videoId, state, timestamp, volume };
-        socket.to(roomId).emit('youtubeVideoUpdated', room.youtube);
     });
 });
 
-// Helper functions
-function generateUsername() {
-    const adjectives = ['Happy', 'Lucky', 'Sunny', 'Clever', 'Swift'];
-    const nouns = ['Panda', 'Tiger', 'Eagle', 'Dolphin', 'Lion'];
-    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}`;
-}
-
-function cleanupInactiveRooms() {
+// Clean up inactive rooms periodically
+setInterval(() => {
     const now = Date.now();
-    const inactivityPeriod = 24 * 60 * 60 * 1000; // 24 hours
-
     for (const [roomId, room] of rooms.entries()) {
-        if (room.users.size === 0 && (now - room.created) > inactivityPeriod) {
+        if (room.users.size === 0 && now - room.created > 24 * 60 * 60 * 1000) {
             rooms.delete(roomId);
         }
     }
-}
+}, 60 * 60 * 1000); // Check every hour
 
 // Start server
 const server = http.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
 
-// Graceful shutdown
+// Handle server shutdown
 process.on('SIGTERM', () => {
     server.close(() => {
-        console.log('Server shutdown complete');
+        console.log('Server terminated');
+    });
+});
+
+process.on('SIGINT', () => {
+    server.close(() => {
+        console.log('Server interrupted');
     });
 });

@@ -1,480 +1,554 @@
 // Constants
-const YOUTUBE_API_KEY = 'AIzaSyDVhKUC83wcj6Q_3auQVLnjRJFB_HzIom0';
-const TYPING_TIMEOUT = 1000;
 const NOTIFICATION_DURATION = 3000;
 
-// Room Page Scripts
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize variables
-    let player;
-    let socket;
-    const roomId = window.location.pathname.split('/').pop();
-    let currentUser = {
-        id: generateUserId(),
-        name: localStorage.getItem('username') || generateUsername(),
-        isHost: false,
-        isMuted: false,
-        hasCamera: false,
-        isScreenSharing: false
-    };
+// Global Variables
+let socket;
+let player;
+let currentUser = {
+    id: generateUserId(),
+    name: localStorage.getItem('username') || generateRandomUsername(),
+    isHost: false
+};
+let roomId = window.location.pathname.split('/').pop();
+let localStream = null;
+let screenStream = null;
+let nextPageToken = '';
+let isSearching = false;
+let lastSearchQuery = '';
 
-    // Initialize UI elements
-    initializeUI();
-    initializeSocket();
-    initializeYouTubePlayer();
-    initializeEventListeners();
+// ============ Utility Functions ============
+function generateUserId() {
+    return `user_${Math.random().toString(36).substr(2, 9)}`;
+}
 
-    // UI Initialization
-    function initializeUI() {
-        // Set room ID
-        document.getElementById('roomId').textContent = roomId;
+function generateRandomUsername() {
+    const adjectives = ['Neşeli', 'Heyecanlı', 'Enerjik', 'Sevimli', 'Şaşkın'];
+    const nouns = ['Penguen', 'Panda', 'Aslan', 'Kaplan', 'Tavşan'];
+    return `${adjectives[Math.floor(Math.random() * adjectives.length)]}${nouns[Math.floor(Math.random() * nouns.length)]}${Math.floor(Math.random() * 100)}`;
+}
 
-        // Set user avatar
-        const userAvatar = document.getElementById('userAvatar');
-        userAvatar.src = generateAvatarUrl(currentUser.name);
-        document.getElementById('userName').textContent = currentUser.name;
-
-        // Initialize tabs
-        const tabButtons = document.querySelectorAll('.tab-btn');
-        const tabContents = document.querySelectorAll('.tab-content');
-
-        tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const tabName = button.dataset.tab;
-                
-                // Update active states
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                tabContents.forEach(content => content.classList.remove('active'));
-                
-                button.classList.add('active');
-                document.getElementById(tabName + 'Tab').classList.add('active');
-            });
-        });
-
-        // Initialize tooltips
-        const buttons = document.querySelectorAll('[title]');
-        buttons.forEach(button => {
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip';
-            tooltip.textContent = button.getAttribute('title');
-            button.appendChild(tooltip);
-        });
-    }
-
-    // Socket Initialization
-    function initializeSocket() {
-        socket = io({
-            query: {
-                roomId,
-                userId: currentUser.id,
-                username: currentUser.name
-            }
-        });
-
-        // Socket event listeners
-        socket.on('connect', () => {
-            showNotification('Odaya bağlandınız', 'success');
-        });
-
-        socket.on('userJoined', (user) => {
-            addParticipant(user);
-            showNotification(`${user.name} odaya katıldı`, 'info');
-        });
-
-        socket.on('userLeft', (userId) => {
-            removeParticipant(userId);
-        });
-
-        socket.on('hostAssigned', (hostId) => {
-            currentUser.isHost = hostId === currentUser.id;
-            updateUIForHost();
-        });
-
-        socket.on('chatMessage', (message) => {
-            addChatMessage(message);
-        });
-
-        socket.on('videoStateChange', (state) => {
-            if (state.type === 'play') {
-                player.playVideo();
-                player.seekTo(state.time);
-            } else if (state.type === 'pause') {
-                player.pauseVideo();
-            }
-        });
-
-        socket.on('reaction', (data) => {
-            showReaction(data.emoji, data.username);
-        });
-    }
-
-    // YouTube Player Initialization
-    function initializeYouTubePlayer() {
-        player = new YT.Player('player', {
-            height: '100%',
-            width: '100%',
-            videoId: '',
-            playerVars: {
-                'playsinline': 1,
-                'controls': 0,
-                'rel': 0
-            },
-            events: {
-                'onReady': onPlayerReady,
-                'onStateChange': onPlayerStateChange
-            }
-        });
-    }
-
-    function onPlayerReady(event) {
-        // Initialize volume slider
-        const volumeSlider = document.getElementById('volumeSlider');
-        volumeSlider.value = player.getVolume();
-        
-        volumeSlider.addEventListener('input', (e) => {
-            const volume = parseInt(e.target.value);
-            player.setVolume(volume);
-            updateVolumeIcon(volume);
-        });
-
-        // Initialize progress bar
-        setInterval(updateProgressBar, 1000);
-    }
-
-    function onPlayerStateChange(event) {
-        if (currentUser.isHost) {
-            socket.emit('videoStateChange', {
-                type: event.data === YT.PlayerState.PLAYING ? 'play' : 'pause',
-                time: player.getCurrentTime()
-            });
-        }
-    }
-
-    // Event Listeners
-    function initializeEventListeners() {
-        // Video Controls
-        document.getElementById('playPauseBtn').addEventListener('click', togglePlayPause);
-        document.getElementById('muteBtn').addEventListener('click', toggleMute);
-        document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-        document.getElementById('progressBar').addEventListener('click', seekVideo);
-
-        // Room Controls
-        document.getElementById('copyRoomLink').addEventListener('click', copyRoomLink);
-        document.getElementById('settingsBtn').addEventListener('click', openSettings);
-        document.getElementById('micBtn').addEventListener('click', toggleMicrophone);
-        document.getElementById('camBtn').addEventListener('click', toggleCamera);
-        document.getElementById('screenShareBtn').addEventListener('click', toggleScreenShare);
-
-        // Video Source Controls
-        document.getElementById('youtubeBtn').addEventListener('click', () => {
-            document.getElementById('videoUrlModal').classList.add('active');
-        });
-        document.getElementById('closeVideoUrlModal').addEventListener('click', () => {
-            document.getElementById('videoUrlModal').classList.remove('active');
-        });
-        document.getElementById('loadVideoBtn').addEventListener('click', loadVideo);
-
-        // Chat Controls
-        const messageInput = document.getElementById('messageInput');
-        const sendMessage = document.getElementById('sendMessage');
-
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendChatMessage();
-            }
-        });
-
-        sendMessage.addEventListener('click', sendChatMessage);
-
-        // Reaction Controls
-        document.querySelectorAll('.reaction').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const emoji = btn.dataset.emoji;
-                socket.emit('reaction', { emoji, username: currentUser.name });
-                showReaction(emoji, currentUser.name);
-            });
-        });
-    }
-
-    // Video Control Functions
-    function togglePlayPause() {
-        const button = document.getElementById('playPauseBtn');
-        if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-            player.pauseVideo();
-            button.innerHTML = '<i class="fas fa-play"></i>';
-        } else {
-            player.playVideo();
-            button.innerHTML = '<i class="fas fa-pause"></i>';
-        }
-    }
-
-    function toggleMute() {
-        const button = document.getElementById('muteBtn');
-        if (player.isMuted()) {
-            player.unMute();
-            button.innerHTML = '<i class="fas fa-volume-up"></i>';
-        } else {
-            player.mute();
-            button.innerHTML = '<i class="fas fa-volume-mute"></i>';
-        }
-    }
-
-    function toggleFullscreen() {
-        const container = document.querySelector('.video-container');
-        if (!document.fullscreenElement) {
-            container.requestFullscreen();
-        } else {
-            document.exitFullscreen();
-        }
-    }
-
-    function updateProgressBar() {
-        if (player && player.getCurrentTime) {
-            const currentTime = player.getCurrentTime();
-            const duration = player.getDuration();
-            const progress = (currentTime / duration) * 100;
-            
-            document.querySelector('.progress-filled').style.width = `${progress}%`;
-            document.getElementById('currentTime').textContent = formatDuration(currentTime);
-            document.getElementById('duration').textContent = formatDuration(duration);
-        }
-    }
-
-    function seekVideo(e) {
-        const progressBar = document.getElementById('progressBar');
-        const rect = progressBar.getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
-        const time = pos * player.getDuration();
-        player.seekTo(time);
-    }
-
-    // Chat Functions
-    function sendChatMessage() {
-        const input = document.getElementById('messageInput');
-        const message = input.value.trim();
-        
-        if (message) {
-            socket.emit('chatMessage', {
-                userId: currentUser.id,
-                username: currentUser.name,
-                message,
-                timestamp: new Date().toISOString()
-            });
-            input.value = '';
-        }
-    }
-
-    function addChatMessage(message) {
-        const messages = document.getElementById('messages');
-        const messageElement = document.createElement('div');
-        messageElement.className = 'message';
-        messageElement.innerHTML = `
-            <div class="message-header">
-                <img src="${generateAvatarUrl(message.username)}" class="message-avatar" alt="${message.username}">
-                <span class="message-username">${message.username}</span>
-                <span class="message-time">${formatTime(new Date(message.timestamp))}</span>
-            </div>
-            <div class="message-content">${message.message}</div>
-        `;
-        messages.appendChild(messageElement);
-        messages.scrollTop = messages.scrollHeight;
-    }
-
-    // Participant Functions
-    function addParticipant(user) {
-        const participantsList = document.getElementById('participants');
-        const participantElement = document.createElement('div');
-        participantElement.className = `participant ${user.isHost ? 'host' : ''}`;
-        participantElement.dataset.userId = user.id;
-        participantElement.innerHTML = `
-            <img src="${generateAvatarUrl(user.username)}" class="participant-avatar" alt="${user.username}">
-            <div class="participant-info">
-                <span class="participant-name">${user.username}</span>
-                ${user.isHost ? '<span class="participant-badge">Host</span>' : ''}
-            </div>
-            <div class="participant-controls">
-                <button class="control-btn" title="Mikrofon">
-                    <i class="fas fa-microphone${user.isMuted ? '-slash' : ''}"></i>
-                </button>
-                <button class="control-btn" title="Kamera">
-                    <i class="fas fa-video${user.hasCamera ? '' : '-slash'}"></i>
-                </button>
-            </div>
-        `;
-        participantsList.appendChild(participantElement);
-    }
-
-    function removeParticipant(userId) {
-        const participant = document.querySelector(`.participant[data-user-id="${userId}"]`);
-        if (participant) {
-            participant.remove();
-        }
-    }
-
-    // Media Control Functions
-    function toggleMicrophone() {
-        const button = document.getElementById('micBtn');
-        currentUser.isMuted = !currentUser.isMuted;
-        button.classList.toggle('muted');
-        button.innerHTML = `<i class="fas fa-microphone${currentUser.isMuted ? '-slash' : ''}"></i>`;
-        socket.emit('mediaStateChange', { type: 'mic', state: !currentUser.isMuted });
-    }
-
-    function toggleCamera() {
-        const button = document.getElementById('camBtn');
-        currentUser.hasCamera = !currentUser.hasCamera;
-        button.classList.toggle('active');
-        button.innerHTML = `<i class="fas fa-video${currentUser.hasCamera ? '' : '-slash'}"></i>`;
-        socket.emit('mediaStateChange', { type: 'camera', state: currentUser.hasCamera });
-    }
-
-    async function toggleScreenShare() {
-        const button = document.getElementById('screenShareBtn');
-        try {
-            if (!currentUser.isScreenSharing) {
-                const stream = await navigator.mediaDevices.getDisplayMedia();
-                // Handle screen sharing stream
-                currentUser.isScreenSharing = true;
-                button.classList.add('active');
-                showNotification('Ekran paylaşımı başlatıldı', 'success');
-            } else {
-                // Stop screen sharing
-                currentUser.isScreenSharing = false;
-                button.classList.remove('active');
-                showNotification('Ekran paylaşımı durduruldu', 'info');
-            }
-        } catch (error) {
-            showNotification('Ekran paylaşımı başlatılamadı', 'error');
-        }
-    }
-
-    // Utility Functions
-    function copyRoomLink() {
-        const roomUrl = window.location.href;
-        copyToClipboard(roomUrl);
-    }
-
-    function loadVideo() {
-        const input = document.getElementById('videoUrlInput');
-        const url = input.value.trim();
-        const videoId = extractVideoId(url);
-        
-        if (videoId) {
-            player.loadVideoById(videoId);
-            document.getElementById('videoUrlModal').classList.remove('active');
-            input.value = '';
-            document.getElementById('videoOverlay').style.display = 'none';
-        } else {
-            showNotification('Geçersiz YouTube URL\'si', 'error');
-        }
-    }
-
-    function extractVideoId(url) {
-        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-        const match = url.match(regex);
-        return match ? match[1] : null;
-    }
-
-    function showReaction(emoji, username) {
-        const overlay = document.getElementById('reactionOverlay');
-        const reaction = document.createElement('div');
-        reaction.className = 'floating-reaction';
-        reaction.innerHTML = `
-            <div class="reaction-emoji">${emoji}</div>
-            <div class="reaction-username">${username}</div>
-        `;
-        
-        overlay.appendChild(reaction);
-        
-        // Animate and remove
-        setTimeout(() => {
-            reaction.remove();
-        }, 3000);
-    }
-
-    function updateUIForHost() {
-        const hostControls = document.querySelectorAll('.host-only');
-        hostControls.forEach(control => {
-            control.style.display = currentUser.isHost ? 'flex' : 'none';
-        });
-    }
-
-    function updateVolumeIcon(volume) {
-        const muteBtn = document.getElementById('muteBtn');
-        if (volume === 0) {
-            muteBtn.innerHTML = '<i class="fas fa-volume-mute"></i>';
-        } else if (volume < 50) {
-            muteBtn.innerHTML = '<i class="fas fa-volume-down"></i>';
-        } else {
-            muteBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-        }
-    }
-});
-
-// Utility Functions
 function showNotification(message, type = 'info') {
+    const container = document.getElementById('notificationContainer');
+    if (!container) return;
+
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
-        <i class="fas ${getNotificationIcon(type)}"></i>
+        <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'times' : 'info'}-circle"></i>
         <span>${message}</span>
     `;
-
-    document.querySelector('.notification-container').appendChild(notification);
-
+    
+    container.appendChild(notification);
     setTimeout(() => {
         notification.classList.add('fade-out');
         setTimeout(() => notification.remove(), 300);
     }, NOTIFICATION_DURATION);
 }
 
-function getNotificationIcon(type) {
-    const icons = {
-        success: 'fa-check-circle',
-        error: 'fa-times-circle',
-        warning: 'fa-exclamation-triangle',
-        info: 'fa-info-circle'
+// ============ YouTube Player Functions ============
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player('player', {
+        height: '100%',
+        width: '100%',
+        videoId: '',
+        playerVars: {
+            'playsinline': 1,
+            'controls': 1,
+            'rel': 0
+        },
+        events: {
+            'onReady': onPlayerReady,
+            'onStateChange': onPlayerStateChange,
+            'onError': onPlayerError
+        }
+    });
+}
+
+function onPlayerReady(event) {
+    console.log('Player ready');
+    document.getElementById('videoOverlay').style.display = 'flex';
+}
+
+function onPlayerStateChange(event) {
+    if (socket) {
+        socket.emit('videoStateChange', {
+            state: event.data,
+            time: player.getCurrentTime()
+        });
+    }
+}
+
+function onPlayerError(event) {
+    console.error('Player error:', event.data);
+    showNotification('Video yüklenirken bir hata oluştu', 'error');
+}
+
+// ============ Media Control Functions ============
+async function toggleCamera() {
+    try {
+        const button = document.getElementById('toggleCameraBtn');
+        
+        if (localStream && localStream.getVideoTracks().length > 0) {
+            localStream.getVideoTracks().forEach(track => track.stop());
+            button.classList.remove('active');
+            showNotification('Kamera kapatıldı', 'info');
+        } else {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            localStream = stream;
+            button.classList.add('active');
+            showNotification('Kamera açıldı', 'success');
+        }
+        
+        if (socket) {
+            socket.emit('mediaStateChange', {
+                type: 'camera',
+                enabled: button.classList.contains('active')
+            });
+        }
+    } catch (error) {
+        console.error('Camera error:', error);
+        showNotification('Kamera erişiminde hata oluştu', 'error');
+    }
+}
+
+async function toggleMicrophone() {
+    try {
+        const button = document.getElementById('toggleMicBtn');
+        
+        if (localStream && localStream.getAudioTracks().length > 0) {
+            localStream.getAudioTracks().forEach(track => track.stop());
+            button.classList.remove('active');
+            showNotification('Mikrofon kapatıldı', 'info');
+        } else {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            localStream = stream;
+            button.classList.add('active');
+            showNotification('Mikrofon açıldı', 'success');
+        }
+        
+        if (socket) {
+            socket.emit('mediaStateChange', {
+                type: 'microphone',
+                enabled: button.classList.contains('active')
+            });
+        }
+    } catch (error) {
+        console.error('Microphone error:', error);
+        showNotification('Mikrofon erişiminde hata oluştu', 'error');
+    }
+}
+
+async function toggleScreenShare() {
+    try {
+        const button = document.getElementById('screenShareBtn');
+        const screenVideo = document.getElementById('screenShareVideo');
+        const videoOverlay = document.getElementById('videoOverlay');
+        
+        if (screenStream) {
+            screenStream.getTracks().forEach(track => track.stop());
+            screenStream = null;
+            screenVideo.style.display = 'none';
+            screenVideo.srcObject = null;
+            button.classList.remove('active');
+            showNotification('Ekran paylaşımı durduruldu', 'info');
+            
+            // Video yüklenmemişse overlay'i göster
+            if (!player || !player.getVideoUrl()) {
+                videoOverlay.style.display = 'flex';
+            }
+        } else {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                video: { 
+                    cursor: "always",
+                    displaySurface: "monitor"
+                },
+                audio: false
+            });
+            
+            screenStream = stream;
+            screenVideo.srcObject = stream;
+            screenVideo.style.display = 'block';
+            button.classList.add('active');
+            videoOverlay.style.display = 'none';
+            showNotification('Ekran paylaşımı başlatıldı', 'success');
+            
+            // Ekran paylaşımı durdurulduğunda
+            stream.getVideoTracks()[0].onended = () => {
+                screenStream = null;
+                screenVideo.style.display = 'none';
+                screenVideo.srcObject = null;
+                button.classList.remove('active');
+                showNotification('Ekran paylaşımı durduruldu', 'info');
+                
+                // Video yüklenmemişse overlay'i göster
+                if (!player || !player.getVideoUrl()) {
+                    videoOverlay.style.display = 'flex';
+                }
+            };
+        }
+        
+        if (socket) {
+            socket.emit('mediaStateChange', {
+                type: 'screen',
+                enabled: button.classList.contains('active')
+            });
+        }
+    } catch (error) {
+        console.error('Screen share error:', error);
+        showNotification('Ekran paylaşımında hata oluştu', 'error');
+    }
+}
+
+// ============ Room Control Functions ============
+function copyRoomLink() {
+    const roomLink = window.location.href;
+    navigator.clipboard.writeText(roomLink)
+        .then(() => {
+            showNotification('Oda bağlantısı kopyalandı', 'success');
+        })
+        .catch(() => {
+            showNotification('Bağlantı kopyalanamadı', 'error');
+        });
+}
+
+function leaveRoom() {
+    if (socket) {
+        socket.disconnect();
+    }
+    window.location.href = '/';
+}
+
+// ============ Chat Functions ============
+function sendMessage() {
+    const input = document.getElementById('messageInput');
+    const message = input.value.trim();
+    
+    if (message && socket) {
+        socket.emit('chatMessage', {
+            user: currentUser,
+            message: message,
+            timestamp: new Date().toISOString()
+        });
+        input.value = '';
+    }
+}
+
+function addMessageToChat(data) {
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'chat-message';
+    messageDiv.innerHTML = `
+        <strong>${data.user.name}:</strong> ${data.message}
+    `;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// ============ Socket.IO Functions ============
+function initializeSocket() {
+    // Make sure we have a username
+    if (!localStorage.getItem('username')) {
+        localStorage.setItem('username', currentUser.name);
+    }
+
+    // Initialize socket connection
+    socket = io(window.location.origin, {
+        transports: ['polling', 'websocket'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
+    });
+
+    socket.on('connect', () => {
+        console.log('Socket connected');
+        // Join room after connection
+        socket.emit('join-room', { 
+            roomId, 
+            username: localStorage.getItem('username') || currentUser.name
+        });
+        showNotification('Odaya bağlanıldı', 'success');
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        showNotification('Bağlantı hatası', 'error');
+    });
+
+    socket.on('room-joined', (data) => {
+        console.log('Room joined:', data);
+        showNotification(`${data.user.name} odaya katıldı`, 'info');
+        updateParticipantCount(data.participants.length);
+        
+        // Update users list
+        const usersList = document.getElementById('usersList');
+        if (usersList) {
+            const userItem = document.createElement('div');
+            userItem.className = 'user-item';
+            userItem.setAttribute('data-user-id', data.user.id);
+            userItem.innerHTML = `
+                <span class="user-name">${data.user.name}</span>
+                <div class="user-media-status">
+                    <i class="fas fa-video camera-icon"></i>
+                    <i class="fas fa-microphone mic-icon"></i>
+                </div>
+            `;
+            usersList.appendChild(userItem);
+        }
+    });
+
+    socket.on('user-left', (data) => {
+        console.log('User left:', data);
+        showNotification(`${data.user.name} odadan ayrıldı`, 'info');
+        updateParticipantCount(data.participants.length);
+        
+        // Remove user from list
+        const userItem = document.querySelector(`[data-user-id="${data.user.id}"]`);
+        if (userItem) {
+            userItem.remove();
+        }
+    });
+
+    socket.on('chat-message', (data) => {
+        addMessageToChat(data);
+    });
+
+    socket.on('media-state-change', (data) => {
+        // Update other users' media states
+        const userItem = document.querySelector(`[data-user-id="${data.userId}"]`);
+        if (userItem) {
+            const icon = userItem.querySelector(`.${data.type}-icon`);
+            if (icon) {
+                icon.classList.toggle('active', data.enabled);
+            }
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Socket disconnected');
+        showNotification('Bağlantı kesildi', 'error');
+    });
+
+    socket.on('error', (error) => {
+        console.error('Room error:', error);
+        showNotification(error.message || 'Oda hatası', 'error');
+    });
+}
+
+// ============ YouTube API Functions ============
+async function searchYouTubeVideos(query, pageToken = '') {
+    try {
+        const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=YOUR_API_KEY${pageToken ? '&pageToken=' + pageToken : ''}`);
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('YouTube search error:', error);
+        showNotification('Video arama hatası', 'error');
+        return null;
+    }
+}
+
+function displayVideoResults(videos, append = false) {
+    const resultsContainer = document.getElementById('videoResults');
+    
+    if (!append) {
+        resultsContainer.innerHTML = '';
+    }
+    
+    videos.forEach(video => {
+        const videoElement = document.createElement('div');
+        videoElement.className = 'video-item';
+        videoElement.innerHTML = `
+            <div class="video-thumbnail">
+                <img src="${video.snippet.thumbnails.medium.url}" alt="${video.snippet.title}">
+            </div>
+            <div class="video-info">
+                <h4 class="video-title">${video.snippet.title}</h4>
+                <p class="video-channel">${video.snippet.channelTitle}</p>
+                <p class="video-metadata">
+                    ${new Date(video.snippet.publishedAt).toLocaleDateString()}
+                </p>
+            </div>
+        `;
+        
+        videoElement.addEventListener('click', () => {
+            loadVideo(video.id.videoId);
+            closeVideoModal();
+        });
+        
+        resultsContainer.appendChild(videoElement);
+    });
+}
+
+function handleVideoSearch() {
+    const query = document.getElementById('videoSearchInput').value.trim();
+    if (query === lastSearchQuery) return;
+    
+    lastSearchQuery = query;
+    nextPageToken = '';
+    isSearching = true;
+    
+    searchYouTubeVideos(query)
+        .then(data => {
+            if (data) {
+                nextPageToken = data.nextPageToken;
+                displayVideoResults(data.items);
+            }
+            isSearching = false;
+        });
+}
+
+function handleVideoScroll(event) {
+    const container = event.target;
+    if (isSearching || !nextPageToken) return;
+    
+    const scrollPosition = container.scrollTop + container.clientHeight;
+    const scrollHeight = container.scrollHeight;
+    
+    if (scrollPosition >= scrollHeight - 100) {
+        isSearching = true;
+        
+        searchYouTubeVideos(lastSearchQuery, nextPageToken)
+            .then(data => {
+                if (data) {
+                    nextPageToken = data.nextPageToken;
+                    displayVideoResults(data.items, true);
+                }
+                isSearching = false;
+            });
+    }
+}
+
+function showVideoModal() {
+    const modal = document.getElementById('videoUrlModal');
+    modal.style.display = 'block';
+    document.getElementById('videoSearchInput').focus();
+}
+
+function closeVideoModal() {
+    const modal = document.getElementById('videoUrlModal');
+    modal.style.display = 'none';
+}
+
+// ============ Event Listeners ============
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing room...');
+    
+    // Initialize socket connection
+    initializeSocket();
+    
+    // Set up video overlay
+    const videoOverlay = document.getElementById('videoOverlay');
+    const videoSearchInput = document.getElementById('videoSearchInput');
+    const videoResults = document.getElementById('videoResults');
+    const closeVideoModalBtn = document.getElementById('closeVideoUrlModal');
+
+    if (videoOverlay) {
+        videoOverlay.addEventListener('click', showVideoModal);
+    }
+
+    if (videoSearchInput) {
+        videoSearchInput.addEventListener('input', debounce(handleVideoSearch, 500));
+    }
+
+    if (videoResults) {
+        videoResults.addEventListener('scroll', handleVideoScroll);
+    }
+
+    if (closeVideoModalBtn) {
+        closeVideoModalBtn.addEventListener('click', closeVideoModal);
+    }
+
+    // Set up media control buttons
+    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+    const toggleMicBtn = document.getElementById('toggleMicBtn');
+    const screenShareBtn = document.getElementById('screenShareBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
+
+    if (toggleCameraBtn) {
+        toggleCameraBtn.addEventListener('click', toggleCamera);
+    }
+
+    if (toggleMicBtn) {
+        toggleMicBtn.addEventListener('click', toggleMicrophone);
+    }
+
+    if (screenShareBtn) {
+        screenShareBtn.addEventListener('click', toggleScreenShare);
+    }
+
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            document.getElementById('settingsModal').style.display = 'block';
+        });
+    }
+
+    // Set up room control buttons
+    const copyRoomLinkBtn = document.getElementById('copyRoomLink');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+
+    if (copyRoomLinkBtn) {
+        copyRoomLinkBtn.addEventListener('click', copyRoomLink);
+    }
+
+    if (leaveRoomBtn) {
+        leaveRoomBtn.addEventListener('click', leaveRoom);
+    }
+
+    // Set up chat
+    const sendMessageBtn = document.getElementById('sendMessageBtn');
+    const messageInput = document.getElementById('messageInput');
+
+    if (sendMessageBtn && messageInput) {
+        sendMessageBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    }
+
+    // Set up room info
+    const roomIdElement = document.getElementById('roomId');
+    if (roomIdElement) {
+        roomIdElement.textContent = roomId;
+    }
+
+    // Initialize media devices
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(stream => {
+            localStream = stream;
+            stream.getTracks().forEach(track => track.enabled = false);
+        })
+        .catch(error => {
+            console.error('Media device error:', error);
+            showNotification('Kamera ve mikrofon erişimi reddedildi', 'error');
+        });
+
+    console.log('Room initialization complete');
+});
+
+function extractVideoId(url) {
+    if (!url) return null;
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+}
+
+function updateParticipantCount(count) {
+    const countElement = document.getElementById('participantCount');
+    if (countElement) {
+        countElement.textContent = count;
+    }
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            func.apply(context, args);
+        }, wait);
     };
-    return icons[type] || icons.info;
-}
-
-function formatTime(date) {
-    return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function generateRandomColor() {
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B6B6B', '#E9D985', '#7FD1B9', '#FF9EAA'];
-    return colors[Math.floor(Math.random() * colors.length)];
-}
-
-function generateRandomUsername() {
-    const adjectives = ['Neşeli', 'Heyecanlı', 'Enerjik', 'Sevimli', 'Şaşkın', 'Meraklı', 'Mutlu', 'Hızlı', 'Akıllı', 'Güçlü'];
-    const nouns = ['Penguen', 'Panda', 'Aslan', 'Kaplan', 'Tavşan', 'Kedi', 'Köpek', 'Kuş', 'Fil', 'Zürafa'];
-    
-    const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const noun = nouns[Math.floor(Math.random() * nouns.length)];
-    const number = Math.floor(Math.random() * 100);
-    
-    return `${adjective}${noun}${number}`;
-}
-
-function generateAvatarUrl(username) {
-    return `https://api.dicebear.com/6.x/fun-emoji/svg?seed=${username}`;
-}
-
-function generateUserId() {
-    return `user_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-function formatDuration(time) {
-    const hours = Math.floor(time / 3600);
-    const minutes = Math.floor((time % 3600) / 60);
-    const seconds = Math.floor(time % 60);
-    
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text);
 }
