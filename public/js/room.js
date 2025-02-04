@@ -111,6 +111,79 @@ function initializeSocket() {
         console.error('Socket.IO hatası:', error);
         showNotification('Bir hata oluştu', 'error');
     });
+
+    // Socket events
+    socket.on('connect', () => {
+        showNotification('Connected to server', 'success');
+    });
+
+    socket.on('disconnect', () => {
+        showNotification('Disconnected from server', 'error');
+    });
+
+    // Kullanıcı sayısını güncelle
+    socket.on('userCount', (count) => {
+        if (userCountSpan) {
+            userCountSpan.textContent = count;
+        }
+    });
+
+    // Mesaj alma
+    socket.on('chatMessage', (data) => {
+        appendMessage(data);
+    });
+
+    // Yazıyor göstergesi
+    socket.on('typing', (data) => {
+        if (!typingIndicator) return;
+        typingIndicator.textContent = `${data.username} yazıyor...`;
+        typingIndicator.style.display = 'block';
+
+        // Yazıyor göstergesini 3 saniye sonra gizle
+        setTimeout(() => {
+            typingIndicator.style.display = 'none';
+        }, 3000);
+    });
+
+    // Oda olayları
+    socket.on('roomJoined', (data) => {
+        isModerator = data.isModerator;
+        updateUIForRole();
+        showNotification(`Odaya katıldınız: ${data.roomId}`, 'success');
+    });
+
+    socket.on('userJoined', (data) => {
+        showNotification(`${data.username} odaya katıldı`, 'info');
+        if (data.users) {
+            updateUserList(data.users);
+        }
+    });
+
+    socket.on('userLeft', (data) => {
+        showNotification(`${data.username} odadan ayrıldı`, 'info');
+        if (data.users) {
+            updateUserList(data.users);
+        }
+    });
+
+    socket.on('screenShareStarted', (data) => {
+        if (data.userId !== socket.id) {
+            showNotification(`${data.username} ekran paylaşımı başlattı`, 'info');
+        }
+    });
+
+    socket.on('screenShareStopped', (data) => {
+        if (data.userId !== socket.id) {
+            showNotification(`${data.username} ekran paylaşımını durdurdu`, 'info');
+        }
+    });
+
+    // YouTube senkronizasyon olayları
+    socket.on('youtubeStateChange', (data) => {
+        if (data.userId !== socket.id) {
+            updateYoutubePlayer(data);
+        }
+    });
 }
 
 // DOM yüklendikten sonra elementleri al ve olayları başlat
@@ -176,25 +249,9 @@ if (!username) {
     localStorage.setItem('username', username);
 }
 
-// Bağlantı durumu
-socket.on('connect', () => {
-    showNotification('Connected to server', 'success');
-});
-
-socket.on('disconnect', () => {
-    showNotification('Disconnected from server', 'error');
-});
-
-// Kullanıcı sayısını güncelle
-socket.on('userCount', (count) => {
-    if (userCountSpan) {
-        userCountSpan.textContent = count;
-    }
-});
-
 // Mesaj gönderme işlevi
 function sendMessage() {
-    if (!messageInput) return;
+    if (!messageInput || !socket) return;
     
     const message = messageInput.value.trim();
     if (message) {
@@ -207,11 +264,6 @@ function sendMessage() {
         messageInput.value = '';
     }
 }
-
-// Mesaj alma
-socket.on('chatMessage', (data) => {
-    appendMessage(data);
-});
 
 // Mesajı sohbete ekle
 function appendMessage(data) {
@@ -233,24 +285,9 @@ function appendMessage(data) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Yazıyor göstergesi
-socket.on('typing', (data) => {
-    if (!typingIndicator) return;
-    
-    if (data.username !== username) {
-        typingIndicator.textContent = `${data.username} is typing...`;
-        typingIndicator.style.display = 'block';
-    }
-});
-
-socket.on('stopTyping', () => {
-    if (!typingIndicator) return;
-    typingIndicator.style.display = 'none';
-});
-
 // Ekran paylaşımı
 async function startScreenShare() {
-    if (!videoOverlay || !player) return;
+    if (!videoOverlay || !player || !socket) return;
 
     try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -320,42 +357,6 @@ function showNotification(message, type = 'info') {
         setTimeout(() => notification.remove(), 500);
     }, 3000);
 }
-
-// Socket events
-socket.on('roomJoined', (data) => {
-    isModerator = data.isModerator;
-    updateUIForRole();
-    
-    if (data.youtube.videoId) {
-        loadYoutubeVideo(data.youtube.videoId, data.youtube.timestamp);
-    }
-});
-
-socket.on('permissionGranted', ({ permission }) => {
-    if (permission === 'screenShare') {
-        shareScreenBtn.disabled = false;
-    } else if (permission === 'youtubeControl') {
-        youtubeUrlInput.disabled = false;
-        youtubePlayBtn.disabled = false;
-    }
-});
-
-socket.on('permissionRevoked', ({ permission }) => {
-    if (permission === 'screenShare') {
-        shareScreenBtn.disabled = true;
-    } else if (permission === 'youtubeControl') {
-        youtubeUrlInput.disabled = true;
-        youtubePlayBtn.disabled = true;
-    }
-});
-
-socket.on('youtubeVideoUpdated', (youtubeState) => {
-    if (!youtubePlayer) {
-        loadYoutubeVideo(youtubeState.videoId, youtubeState.timestamp);
-    } else {
-        updateYoutubePlayer(youtubeState);
-    }
-});
 
 // YouTube işlevleri
 function loadYoutubeVideo(videoId, startTime = 0) {
