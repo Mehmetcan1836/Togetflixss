@@ -4,311 +4,208 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Togetflix - Watch Together</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        :root {
-            --primary-color: #e11d48;
-            --primary-dark: #be123c;
-            --primary-light: #fb7185;
-            --background-color: #18181b;
-            --surface-color: #27272a;
-            --text-primary: #fafafa;
-            --text-secondary: #a1a1aa;
-            --border-radius: 12px;
-            --transition-speed: 0.3s;
-        }
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="landing-container">
+        <header class="landing-header">
+            <h1>Togetflix</h1>
+            <p>Watch movies together with friends in real-time</p>
+        </header>
 
-        * {
+        <main class="landing-content">
+            <div class="room-actions">
+                <button id="createRoom" class="btn primary">Create New Room</button>
+                <div class="divider">or</div>
+                <div class="join-room">
+                    <input type="text" id="roomInput" placeholder="Enter Room ID">
+                    <button id="joinRoom" class="btn secondary">Join Room</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <style>
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-primary);
-            line-height: 1.5;
+            background: #f8f9fa;
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2rem;
         }
 
-        .logo {
-            font-size: 3rem;
-            font-weight: bold;
-            color: var(--primary-color);
+        .landing-container {
+            max-width: 600px;
+            width: 90%;
+            padding: 2rem;
             text-align: center;
+        }
+
+        .landing-header {
+            margin-bottom: 3rem;
+        }
+
+        .landing-header h1 {
+            font-size: 3rem;
+            color: #e11d48;
+            margin: 0;
             margin-bottom: 1rem;
         }
 
-        .logo span {
-            color: var(--text-primary);
+        .landing-header p {
+            font-size: 1.2rem;
+            color: #6c757d;
+            margin: 0;
         }
 
-        .description {
-            text-align: center;
-            color: var(--text-secondary);
-            max-width: 600px;
-            margin-bottom: 2rem;
-        }
-
-        .room-controls {
+        .room-actions {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
-            gap: 1rem;
-            width: 100%;
-            max-width: 400px;
-            background: var(--surface-color);
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .input-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 2px solid transparent;
-            border-radius: var(--border-radius);
-            background: var(--background-color);
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: all var(--transition-speed) ease;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: var(--primary-color);
+            gap: 1.5rem;
         }
 
         .btn {
-            padding: 0.75rem 1.5rem;
+            padding: 1rem 2rem;
             border: none;
-            border-radius: var(--border-radius);
-            background: var(--primary-color);
-            color: var(--text-primary);
-            font-size: 1rem;
+            border-radius: 8px;
+            font-size: 1.1rem;
             cursor: pointer;
-            transition: all var(--transition-speed) ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
+            transition: all 0.3s ease;
+            width: 100%;
         }
 
-        .btn:hover {
-            background: var(--primary-dark);
+        .btn.primary {
+            background: #e11d48;
+            color: white;
         }
 
-        .btn:active {
-            transform: translateY(1px);
-        }
-
-        .btn i {
-            font-size: 1.25rem;
+        .btn.primary:hover {
+            background: #be123c;
         }
 
         .btn.secondary {
-            background: transparent;
-            border: 2px solid var(--primary-color);
+            background: #6c757d;
+            color: white;
         }
 
         .btn.secondary:hover {
-            background: var(--primary-color);
+            background: #5a6268;
         }
 
         .divider {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            color: var(--text-secondary);
-            width: 100%;
-            margin: 0.5rem 0;
+            color: #6c757d;
+            font-size: 0.9rem;
+            position: relative;
+            text-align: center;
+            padding: 0.5rem 0;
         }
 
         .divider::before,
         .divider::after {
-            content: "";
-            flex: 1;
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 45%;
             height: 1px;
-            background: var(--text-secondary);
-            opacity: 0.2;
+            background: #dee2e6;
         }
 
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            width: 100%;
-            max-width: 800px;
-            margin-top: 2rem;
+        .divider::before {
+            left: 0;
         }
 
-        .feature {
-            background: var(--surface-color);
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
+        .divider::after {
+            right: 0;
+        }
+
+        .join-room {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            text-align: center;
             gap: 1rem;
         }
 
-        .feature i {
-            font-size: 2rem;
-            color: var(--primary-color);
+        input {
+            padding: 1rem;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            width: 100%;
+            box-sizing: border-box;
         }
 
-        .feature h3 {
-            color: var(--text-primary);
-            font-size: 1.25rem;
+        input:focus {
+            outline: none;
+            border-color: #e11d48;
         }
 
-        .feature p {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        footer {
-            text-align: center;
-            padding: 2rem;
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        @media (max-width: 768px) {
-            .container {
+        @media (max-width: 480px) {
+            .landing-container {
                 padding: 1rem;
             }
 
-            .logo {
-                font-size: 2rem;
+            .landing-header h1 {
+                font-size: 2.5rem;
             }
 
-            .room-controls {
-                padding: 1.5rem;
+            .landing-header p {
+                font-size: 1rem;
             }
 
-            .features {
-                grid-template-columns: 1fr;
+            .btn {
+                padding: 0.8rem 1.5rem;
+                font-size: 1rem;
             }
         }
     </style>
-</head>
-<body>
-    <div class="container">
-        <div class="logo">
-            Toget<span>flix</span>
-        </div>
-        
-        <p class="description">
-            Watch movies and shows together with friends, synchronized and in real-time. Share your screen, chat, and enjoy the experience together!
-        </p>
-
-        <div class="room-controls">
-            <div class="input-group">
-                <input type="text" id="roomInput" placeholder="Enter 6-digit room code" maxlength="6" pattern="[A-Z0-9]{6}">
-                <button id="joinRoom" class="btn" disabled>
-                    <i class="fas fa-sign-in-alt"></i>
-                    Join
-                </button>
-            </div>
-
-            <div class="divider">or</div>
-
-            <button id="createRoom" class="btn secondary">
-                <i class="fas fa-plus"></i>
-                Create New Room
-            </button>
-        </div>
-
-        <div class="features">
-            <div class="feature">
-                <i class="fas fa-tv"></i>
-                <h3>Screen Sharing</h3>
-                <p>Share your screen with perfect synchronization and high quality</p>
-            </div>
-
-            <div class="feature">
-                <i class="fas fa-comments"></i>
-                <h3>Live Chat</h3>
-                <p>Chat with your friends while watching together</p>
-            </div>
-
-            <div class="feature">
-                <i class="fas fa-users"></i>
-                <h3>Watch Together</h3>
-                <p>Invite friends and enjoy content together in real-time</p>
-            </div>
-        </div>
-    </div>
-
-    <footer>
-        &copy; 2024 Togetflix. All rights reserved.
-    </footer>
 
     <script>
-        const roomInput = document.getElementById('roomInput');
-        const joinRoom = document.getElementById('joinRoom');
-        const createRoom = document.getElementById('createRoom');
+        document.addEventListener('DOMContentLoaded', () => {
+            const createRoomButton = document.getElementById('createRoom');
+            const joinRoomButton = document.getElementById('joinRoom');
+            const roomInput = document.getElementById('roomInput');
 
-        // Enable/disable join button based on input
-        roomInput.addEventListener('input', (e) => {
-            const value = e.target.value.toUpperCase();
-            e.target.value = value; // Force uppercase
-            joinRoom.disabled = !/^[A-Z0-9]{6}$/.test(value);
-        });
+            createRoomButton.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/api/rooms', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
 
-        // Join room on enter key
-        roomInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !joinRoom.disabled) {
-                joinRoom.click();
-            }
-        });
-
-        // Join room button click
-        joinRoom.addEventListener('click', () => {
-            const roomId = roomInput.value.toUpperCase();
-            if (/^[A-Z0-9]{6}$/.test(roomId)) {
-                window.location.href = `/room/${roomId}`;
-            }
-        });
-
-        // Create room button click
-        createRoom.addEventListener('click', async () => {
-            try {
-                const response = await fetch('/api/rooms', {
-                    method: 'POST'
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to create room');
+                    const data = await response.json();
+                    if (data.roomId) {
+                        window.location.href = `/room/${data.roomId}`;
+                    } else {
+                        alert('Failed to create room. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error creating room:', error);
+                    alert('Failed to create room. Please try again.');
                 }
+            });
 
-                const data = await response.json();
-                window.location.href = `/room/${data.roomId}`;
-            } catch (error) {
-                console.error('Error creating room:', error);
-                alert('Failed to create room. Please try again.');
-            }
+            joinRoomButton.addEventListener('click', () => {
+                const roomId = roomInput.value.trim();
+                if (roomId) {
+                    window.location.href = `/room/${roomId}`;
+                } else {
+                    alert('Please enter a room ID');
+                }
+            });
+
+            roomInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    joinRoomButton.click();
+                }
+            });
         });
     </script>
 </body>
