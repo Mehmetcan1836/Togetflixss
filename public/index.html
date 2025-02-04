@@ -1,232 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Togetflix - Watch Together</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>Togetflix - Birlikte İzle</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/app.js"></script>
 </head>
 <body>
     <div class="container">
-        <div class="logo">
-            Toget<span>flix</span>
-        </div>
-        
-        <p class="description">
-            Watch movies and shows together with friends, synchronized and in real-time. Share your screen, chat, and enjoy the experience together!
-        </p>
+        <header class="main-header">
+            <h1>Togetflix</h1>
+            <p class="tagline">Arkadaşlarınla birlikte izle, paylaş, sohbet et!</p>
+        </header>
 
-        <div class="room-controls">
-            <div class="input-group">
-                <input type="text" id="roomInput" placeholder="Enter room code">
-                <button id="joinRoom" class="btn">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Join
-                </button>
+        <main class="main-content">
+            <div class="join-section">
+                <div class="form-group">
+                    <label for="username">Kullanıcı Adın</label>
+                    <input type="text" id="username" placeholder="Kullanıcı adını gir veya boş bırak">
+                </div>
+
+                <div class="room-actions">
+                    <div class="create-room">
+                        <h2>Yeni Oda Oluştur</h2>
+                        <button id="createRoom" class="btn primary">Oda Oluştur</button>
+                    </div>
+
+                    <div class="join-room">
+                        <h2>Odaya Katıl</h2>
+                        <div class="form-group">
+                            <input type="text" id="roomId" placeholder="Oda ID'sini gir">
+                            <button id="joinRoom" class="btn secondary">Katıl</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="divider">or</div>
-
-            <button id="createRoom" class="btn secondary">
-                <i class="fas fa-plus"></i>
-                Create New Room
-            </button>
-        </div>
-
-        <div class="features">
-            <div class="feature">
-                <i class="fas fa-tv"></i>
-                <h3>Screen Sharing</h3>
-                <p>Share your screen with perfect synchronization and high quality</p>
+            <div class="features">
+                <h2>Özellikler</h2>
+                <ul>
+                    <li>
+                        <span class="icon">🎥</span>
+                        <h3>Ekran Paylaşımı</h3>
+                        <p>Ekranını paylaşarak arkadaşlarınla birlikte içerik izle</p>
+                    </li>
+                    <li>
+                        <span class="icon">📺</span>
+                        <h3>YouTube Senkronizasyonu</h3>
+                        <p>YouTube videolarını arkadaşlarınla senkronize izle</p>
+                    </li>
+                    <li>
+                        <span class="icon">💬</span>
+                        <h3>Anlık Sohbet</h3>
+                        <p>İzlerken arkadaşlarınla sohbet et</p>
+                    </li>
+                    <li>
+                        <span class="icon">👑</span>
+                        <h3>Moderatör Kontrolü</h3>
+                        <p>Oda sahibi olarak izinleri ve içeriği yönet</p>
+                    </li>
+                </ul>
             </div>
+        </main>
 
-            <div class="feature">
-                <i class="fas fa-comments"></i>
-                <h3>Live Chat</h3>
-                <p>Chat with your friends while watching together</p>
-            </div>
-
-            <div class="feature">
-                <i class="fas fa-users"></i>
-                <h3>Watch Together</h3>
-                <p>Invite friends and enjoy content together in real-time</p>
-            </div>
-        </div>
+        <footer class="main-footer">
+            <p>&copy; 2024 Togetflix. Tüm hakları saklıdır.</p>
+        </footer>
     </div>
 
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8f9fa;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .container {
-            max-width: 600px;
-            width: 90%;
-            padding: 2rem;
-            text-align: center;
-        }
-
-        .logo {
-            font-size: 3rem;
-            color: #e11d48;
-            margin: 0;
-            margin-bottom: 1rem;
-        }
-
-        .logo span {
-            color: #6c757d;
-        }
-
-        .description {
-            font-size: 1.2rem;
-            color: #6c757d;
-            margin: 0;
-        }
-
-        .room-controls {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .input-group {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .btn {
-            padding: 1rem 2rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            width: 100%;
-        }
-
-        .btn.secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn.secondary:hover {
-            background: #5a6268;
-        }
-
-        .divider {
-            color: #6c757d;
-            font-size: 0.9rem;
-            position: relative;
-            text-align: center;
-            padding: 0.5rem 0;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            width: 45%;
-            height: 1px;
-            background: #dee2e6;
-        }
-
-        .divider::before {
-            left: 0;
-        }
-
-        .divider::after {
-            right: 0;
-        }
-
-        input {
-            padding: 1rem;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            font-size: 1rem;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #e11d48;
-        }
-
-        .features {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2rem;
-            justify-content: center;
-        }
-
-        .feature {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 1rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: calc(33.33% - 2rem);
-        }
-
-        .feature i {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-        }
-
-        .feature h3 {
-            font-size: 1.2rem;
-            margin: 0;
-            margin-bottom: 0.5rem;
-        }
-
-        .feature p {
-            font-size: 1rem;
-            margin: 0;
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 1rem;
-            }
-
-            .logo {
-                font-size: 2.5rem;
-            }
-
-            .description {
-                font-size: 1rem;
-            }
-
-            .btn {
-                padding: 0.8rem 1.5rem;
-                font-size: 1rem;
-            }
-
-            .feature {
-                width: 100%;
-            }
-        }
-    </style>
+    <div class="notification-container"></div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const createRoomButton = document.getElementById('createRoom');
             const joinRoomButton = document.getElementById('joinRoom');
-            const roomInput = document.getElementById('roomInput');
+            const roomIdInput = document.getElementById('roomId');
 
             createRoomButton.addEventListener('click', async () => {
                 try {
@@ -250,7 +101,7 @@
             });
 
             joinRoomButton.addEventListener('click', () => {
-                const roomId = roomInput.value.trim();
+                const roomId = roomIdInput.value.trim();
                 if (roomId) {
                     window.location.href = `/room/${roomId}`;
                 } else {
@@ -258,7 +109,7 @@
                 }
             });
 
-            roomInput.addEventListener('keypress', (event) => {
+            roomIdInput.addEventListener('keypress', (event) => {
                 if (event.key === 'Enter') {
                     joinRoomButton.click();
                 }

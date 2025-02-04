@@ -5,8 +5,6 @@ let isTyping = false;
 let typingTimeout = null;
 let isModerator = false;
 let youtubePlayer = null;
-
-// Socket.IO bağlantısı
 let socket = null;
 
 // DOM elementleri
@@ -14,8 +12,110 @@ let chatMessages, messageInput, videoOverlay, roomIdSpan, userCountSpan, typingI
 let sendBtn, shareScreenBtn, copyBtn, leaveBtn, youtubeContainer, youtubeUrlInput, youtubePlayBtn;
 let userList, permissionsModal;
 
-// DOM yüklendikten sonra elementleri al
+// Socket.IO olaylarını başlat
+function initializeSocket() {
+    const serverUrl = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3000'
+        : 'https://togetflix-mehmetcan1836s-projects.vercel.app';
+    
+    socket = io(serverUrl, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+    });
+
+    // Temel socket olayları
+    socket.on('connect', () => {
+        console.log('Socket.IO bağlantısı kuruldu');
+        const roomId = window.location.pathname.split('/').pop();
+        const username = localStorage.getItem('username') || 'Misafir-' + Math.random().toString(36).substr(2, 4);
+        socket.emit('joinRoom', { roomId, username });
+    });
+
+    socket.on('roomJoined', (data) => {
+        currentRoom = data.roomId;
+        isModerator = data.isModerator;
+        updateUIForRole();
+        
+        if (data.youtube && data.youtube.videoId) {
+            loadYoutubeVideo(data.youtube.videoId, data.youtube.timestamp);
+        }
+    });
+
+    socket.on('userJoined', (data) => {
+        if (userCountSpan) {
+            userCountSpan.textContent = data.userCount;
+        }
+        updateUserList(data.users);
+        showNotification(`${data.user.username} odaya katıldı`, 'info');
+    });
+
+    socket.on('userLeft', (data) => {
+        if (userCountSpan) {
+            userCountSpan.textContent = data.userCount;
+        }
+        updateUserList(data.users);
+        showNotification(`${data.username} odadan ayrıldı`, 'info');
+    });
+
+    socket.on('chatMessage', (data) => {
+        if (chatMessages) {
+            appendMessage(data);
+        }
+    });
+
+    socket.on('typing', (data) => {
+        if (typingIndicator) {
+            typingIndicator.textContent = `${data.username} yazıyor...`;
+            typingIndicator.style.display = 'block';
+        }
+    });
+
+    socket.on('stopTyping', () => {
+        if (typingIndicator) {
+            typingIndicator.style.display = 'none';
+        }
+    });
+
+    socket.on('permissionGranted', ({ permission }) => {
+        if (permission === 'screenShare') {
+            shareScreenBtn.disabled = false;
+        } else if (permission === 'youtubeControl') {
+            youtubeUrlInput.disabled = false;
+            youtubePlayBtn.disabled = false;
+        }
+    });
+
+    socket.on('permissionRevoked', ({ permission }) => {
+        if (permission === 'screenShare') {
+            shareScreenBtn.disabled = true;
+        } else if (permission === 'youtubeControl') {
+            youtubeUrlInput.disabled = true;
+            youtubePlayBtn.disabled = true;
+        }
+    });
+
+    socket.on('youtubeVideoUpdated', (youtubeState) => {
+        if (!youtubePlayer) {
+            loadYoutubeVideo(youtubeState.videoId, youtubeState.timestamp);
+        } else {
+            updateYoutubePlayer(youtubeState);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Socket.IO bağlantısı kesildi');
+        showNotification('Sunucu bağlantısı kesildi', 'error');
+    });
+
+    socket.on('error', (error) => {
+        console.error('Socket.IO hatası:', error);
+        showNotification('Bir hata oluştu', 'error');
+    });
+}
+
+// DOM yüklendikten sonra elementleri al ve olayları başlat
 document.addEventListener('DOMContentLoaded', () => {
+    // DOM elementlerini al
     chatMessages = document.getElementById('chatMessages');
     messageInput = document.getElementById('messageInput');
     videoOverlay = document.getElementById('videoOverlay');
@@ -32,16 +132,13 @@ document.addEventListener('DOMContentLoaded', () => {
     userList = document.getElementById('userList');
     permissionsModal = document.getElementById('permissionsModal');
 
-    socket = io(window.location.hostname === 'localhost' 
-        ? 'http://localhost:3000'
-        : 'https://togetflix-mehmetcan1836s-projects.vercel.app');
-
     // Event listener'ları ekle
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
     if (shareScreenBtn) shareScreenBtn.addEventListener('click', startScreenShare);
     if (copyBtn) copyBtn.addEventListener('click', copyRoomLink);
     if (leaveBtn) leaveBtn.addEventListener('click', leaveRoom);
     if (youtubePlayBtn) youtubePlayBtn.addEventListener('click', handleYoutubeVideo);
+    
     if (messageInput) {
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -51,25 +148,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         messageInput.addEventListener('input', () => {
+            if (!socket) return;
+            
             if (!typingTimeout) {
-                socket.emit('typing', { roomId, username });
+                socket.emit('typing', { roomId: currentRoom, username: currentUser });
             }
             
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
-                socket.emit('stopTyping', { roomId, username });
+                socket.emit('stopTyping', { roomId: currentRoom, username: currentUser });
                 typingTimeout = null;
             }, 1000);
         });
     }
 
-    // Oda ID'sini ayarla
-    if (roomIdSpan) {
-        roomIdSpan.textContent = `Room ID: ${roomId}`;
-    }
-
-    // Odaya katıl
-    socket.emit('joinRoom', { roomId, username });
+    // Socket.IO bağlantısını başlat
+    initializeSocket();
 });
 
 // Oda ID'sini URL'den al
@@ -370,4 +464,35 @@ function updateUIForRole() {
 
 function hasPermission(permission) {
     return isModerator || socket.hasPermission?.(permission);
+}
+
+// Kullanıcı listesini güncelle
+function updateUserList(users) {
+    if (!userList) return;
+    
+    userList.innerHTML = '';
+    users.forEach(user => {
+        const userElement = document.createElement('div');
+        userElement.className = 'user-item';
+        userElement.innerHTML = `
+            ${user.username} ${user.isModerator ? '(Moderatör)' : ''}
+            ${isModerator && !user.isModerator ? `
+                <button onclick="togglePermission('${user.id}', 'screenShare')">
+                    ${hasPermission(user.id, 'screenShare') ? 'Ekran Paylaşımını Kapat' : 'Ekran Paylaşımına İzin Ver'}
+                </button>
+                <button onclick="togglePermission('${user.id}', 'youtubeControl')">
+                    ${hasPermission(user.id, 'youtubeControl') ? 'Video Kontrolünü Kapat' : 'Video Kontrolüne İzin Ver'}
+                </button>
+            ` : ''}
+        `;
+        userList.appendChild(userElement);
+    });
+}
+
+// İzinleri kontrol et
+function hasPermission(userId, permission) {
+    if (!socket) return false;
+    const room = rooms?.get(currentRoom);
+    if (!room) return false;
+    return room.permissions.get(userId)?.has(permission) || false;
 }

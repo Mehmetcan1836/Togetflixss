@@ -3,15 +3,23 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: "*",
+        origin: ["http://localhost:3000", "https://togetflix-mehmetcan1836s-projects.vercel.app"],
         methods: ["GET", "POST"],
-        credentials: true
+        credentials: true,
+        allowedHeaders: ["my-custom-header"]
     }
 });
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
 
 const PORT = process.env.PORT || 3000;
+
+// CORS yapılandırması
+app.use(cors({
+    origin: ["http://localhost:3000", "https://togetflix-mehmetcan1836s-projects.vercel.app"],
+    credentials: true
+}));
 
 // Store active rooms and users
 const rooms = new Map();

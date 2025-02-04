@@ -42,77 +42,83 @@ function initializeSocket() {
     return socket;
 }
 
-// Initialize room functionality
+// Ana sayfa işlevleri
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded');
     initializeSocket();
 
     const createRoomBtn = document.getElementById('createRoom');
     const joinRoomBtn = document.getElementById('joinRoom');
-    const roomInput = document.getElementById('roomInput');
+    const roomIdInput = document.getElementById('roomId');
+    const usernameInput = document.getElementById('username');
 
-    // Enable/disable join button based on input
-    roomInput?.addEventListener('input', (e) => {
-        const value = e.target.value.trim();
-        if (joinRoomBtn) {
-            joinRoomBtn.disabled = value.length === 0;
-        }
-    });
+    // Kullanıcı tercihlerini yükle
+    const prefs = utils.getUserPreferences();
+    if (prefs.username) {
+        usernameInput.value = prefs.username;
+    }
 
-    createRoomBtn?.addEventListener('click', async () => {
-        console.log('Create room clicked');
-        try {
-            const response = await fetch('/api/rooms', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
+    // Oda oluştur
+    if (createRoomBtn) {
+        createRoomBtn.addEventListener('click', async () => {
+            try {
+                const username = usernameInput.value.trim() || utils.generateUsername();
+                
+                // Kullanıcı adını kaydet
+                localStorage.setItem('username', username);
+                utils.saveUserPreferences({ ...prefs, username });
+
+                const response = await fetch('/api/rooms', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                if (data.roomId) {
+                    window.location.href = `/room/${data.roomId}`;
+                } else {
+                    throw new Error('Oda ID alınamadı');
+                }
+            } catch (error) {
+                console.error('Oda oluşturma hatası:', error);
+                utils.showNotification('Oda oluşturulurken bir hata oluştu', 'error');
+            }
+        });
+    }
+
+    // Odaya katıl
+    if (joinRoomBtn) {
+        joinRoomBtn.addEventListener('click', () => {
+            const roomId = roomIdInput.value.trim();
+            const username = usernameInput.value.trim() || utils.generateUsername();
+            
+            if (!roomId) {
+                utils.showNotification('Lütfen bir oda ID girin', 'error');
+                return;
+            }
+
+            // Kullanıcı adını kaydet
+            localStorage.setItem('username', username);
+            utils.saveUserPreferences({ ...prefs, username });
+
+            // Odaya yönlendir
+            window.location.href = `/room/${roomId}`;
+        });
+    }
+
+    // Enter tuşu ile form gönderimi
+    [roomIdInput, usernameInput].forEach(input => {
+        if (input) {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (roomIdInput.value) {
+                        joinRoomBtn?.click();
+                    } else {
+                        createRoomBtn?.click();
+                    }
                 }
             });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('Room created:', data);
-
-            if (data.roomId) {
-                window.location.href = `/room/${data.roomId}`;
-            } else {
-                throw new Error('No room ID received');
-            }
-        } catch (error) {
-            console.error('Error creating room:', error);
-            alert('Failed to create room. Please try again.');
-        }
-    });
-
-    joinRoomBtn?.addEventListener('click', async () => {
-        const roomId = roomInput.value.trim().toUpperCase();
-        if (!roomId) {
-            alert('Please enter a room ID');
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/rooms/${roomId}`);
-            const data = await response.json();
-
-            if (data.exists) {
-                window.location.href = `/room/${roomId}`;
-            } else {
-                alert('Room not found. Please check the room ID and try again.');
-            }
-        } catch (error) {
-            console.error('Error joining room:', error);
-            alert('Failed to join room. Please try again.');
-        }
-    });
-
-    // Handle enter key in room input
-    roomInput?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !joinRoomBtn.disabled) {
-            joinRoomBtn.click();
         }
     });
 });
