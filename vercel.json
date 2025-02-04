@@ -16,8 +16,16 @@
       "dest": "server.js"
     },
     {
-      "src": "/room/(.*)",
+      "src": "/api/(.*)",
       "dest": "server.js"
+    },
+    {
+      "src": "/room",
+      "dest": "/public/room.html"
+    },
+    {
+      "src": "/room/(.*)",
+      "dest": "/public/room.html"
     },
     {
       "src": "/(.*)",
