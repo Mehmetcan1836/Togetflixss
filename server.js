@@ -9,12 +9,14 @@ const io = require('socket.io')(http, {
         allowedHeaders: ["*"]
     },
     allowEIO3: true,
-    path: '/socket.io/',
-    transports: ['websocket', 'polling'],
+    path: '/socket.io',  // Remove trailing slash
+    transports: ['polling', 'websocket'],
     pingTimeout: 60000,
     pingInterval: 25000,
     maxHttpBufferSize: 1e8,
-    allowUpgrades: true
+    perMessageDeflate: false,
+    allowUpgrades: true,
+    httpCompression: true
 });
 
 const path = require('path');

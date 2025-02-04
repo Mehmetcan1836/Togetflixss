@@ -13,18 +13,20 @@
   "routes": [
     {
       "src": "/socket.io/(.*)",
-      "dest": "server.js"
-    },
-    {
-      "handle": "filesystem"
+      "dest": "/server.js",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,HEAD,PUT,PATCH,POST,DELETE",
+        "Access-Control-Allow-Headers": "*"
+      }
     },
     {
       "src": "/api/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js"
     },
     {
       "src": "/room/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js"
     },
     {
       "src": "/(.*)",

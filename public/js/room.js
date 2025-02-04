@@ -18,14 +18,15 @@ const configuration = {
 // Initialize socket connection
 function initializeSocket() {
     socket = io(window.location.origin, {
-        path: '/socket.io/',
+        path: '/socket.io',  // Remove trailing slash
         transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
-        timeout: 20000,
+        timeout: 60000,
         autoConnect: true,
+        forceNew: true,
         query: {
             roomId: window.location.pathname.split('/').pop()
         }
