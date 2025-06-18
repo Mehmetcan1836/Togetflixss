@@ -1,23 +1,28 @@
 // Constants
 const NOTIFICATION_DURATION = 3000;
+const SOCKET_RECONNECT_ATTEMPTS = 5;
+const SOCKET_RECONNECT_DELAY = 1000;
 
 // Global Variables
 let socket;
 let localStream;
 let player;
+let screenStream;
 let currentUser = {
     id: generateUserId(),
     name: localStorage.getItem('username') || generateRandomUsername(),
     isHost: false
 };
-let roomId = window.location.pathname.split('/').pop();
+let roomId = window.location.pathname.split('/').pop() || '';
 
-let screenStream = null;
-let nextPageToken = '';
-let isSearching = false;
-let lastSearchQuery = '';
+// Media States
+const mediaStates = {
+    camera: false,
+    microphone: false,
+    screen: false
+};
 
-// ============ Utility Functions ============
+// Helper Functions
 function generateUserId() {
     return `user_${Math.random().toString(36).substr(2, 9)}`;
 }
@@ -44,6 +49,36 @@ function showNotification(message, type = 'info') {
         notification.classList.add('fade-out');
         setTimeout(() => notification.remove(), 300);
     }, NOTIFICATION_DURATION);
+}
+
+function toggleMediaTrack(track, buttonId, mediaType) {
+    try {
+        if (!localStream) {
+            localStream = await navigator.mediaDevices.getUserMedia({ [mediaType]: true });
+        }
+
+        const trackInstance = localStream.getTracks().find(t => t.kind === mediaType);
+        if (trackInstance) {
+            trackInstance.enabled = !trackInstance.enabled;
+            const button = document.getElementById(buttonId);
+            button.classList.toggle('active', trackInstance.enabled);
+            
+            if (socket) {
+                socket.emit('media-state-change', {
+                    type: mediaType,
+                    enabled: trackInstance.enabled
+                });
+            }
+            
+            showNotification(
+                trackInstance.enabled ? `${track} açıldı` : `${track} kapatıldı`,
+                'info'
+            );
+        }
+    } catch (error) {
+        console.error(`${track} toggle error:`, error);
+        showNotification(`${track} erişimi sağlanamadı`, 'error');
+    }
 }
 
 // ============ YouTube Player Functions ============
@@ -100,63 +135,11 @@ function onPlayerStateChange(event) {
 
 // ============ Media Control Functions ============
 async function toggleCamera() {
-    try {
-        if (!localStream) {
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        }
-
-        const videoTrack = localStream.getVideoTracks()[0];
-        if (videoTrack) {
-            videoTrack.enabled = !videoTrack.enabled;
-            const button = document.getElementById('toggleCameraBtn');
-            button.classList.toggle('active', videoTrack.enabled);
-            
-            if (socket) {
-                socket.emit('media-state-change', {
-                    type: 'camera',
-                    enabled: videoTrack.enabled
-                });
-            }
-            
-            showNotification(
-                videoTrack.enabled ? 'Kamera açıldı' : 'Kamera kapatıldı',
-                'info'
-            );
-        }
-    } catch (error) {
-        console.error('Camera toggle error:', error);
-        showNotification('Kamera erişimi sağlanamadı', 'error');
-    }
+    await toggleMediaTrack('Kamera', 'toggleCameraBtn', 'video');
 }
 
 async function toggleMicrophone() {
-    try {
-        if (!localStream) {
-            localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        }
-
-        const audioTrack = localStream.getAudioTracks()[0];
-        if (audioTrack) {
-            audioTrack.enabled = !audioTrack.enabled;
-            const button = document.getElementById('toggleMicBtn');
-            button.classList.toggle('active', audioTrack.enabled);
-            
-            if (socket) {
-                socket.emit('media-state-change', {
-                    type: 'mic',
-                    enabled: audioTrack.enabled
-                });
-            }
-            
-            showNotification(
-                audioTrack.enabled ? 'Mikrofon açıldı' : 'Mikrofon kapatıldı',
-                'info'
-            );
-        }
-    } catch (error) {
-        console.error('Microphone toggle error:', error);
-        showNotification('Mikrofon erişimi sağlanamadı', 'error');
-    }
+    await toggleMediaTrack('Mikrofon', 'toggleMicBtn', 'audio');
 }
 
 async function toggleScreenShare() {
@@ -338,8 +321,9 @@ function initializeSocket() {
     socket = io(window.location.origin, {
         transports: ['polling', 'websocket'],
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000
+        reconnectionAttempts: SOCKET_RECONNECT_ATTEMPTS,
+        reconnectionDelay: SOCKET_RECONNECT_DELAY,
+        autoConnect: false
     });
 
     socket.on('connect', () => {
@@ -349,6 +333,24 @@ function initializeSocket() {
             username: localStorage.getItem('username')
         });
         showNotification('Odaya bağlanıldı', 'success');
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Socket connection error:', error);
+        showNotification('Bağlantı hatası: ' + error.message, 'error');
+        if (socket.reconnectionAttempts > SOCKET_RECONNECT_ATTEMPTS) {
+            showNotification('Bağlantı yeniden kurulamadı', 'error');
+        }
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('Socket disconnected:', reason);
+        showNotification('Bağlantı kesildi', 'error');
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+        console.log('Socket reconnected after', attemptNumber, 'attempts');
+        showNotification('Bağlantı yeniden kuruldu', 'success');
     });
 
     socket.on('room-joined', (data) => {
@@ -390,15 +392,9 @@ function initializeSocket() {
         }
     });
 
-    socket.on('disconnect', () => {
-        console.log('Socket disconnected');
-        showNotification('Bağlantı kesildi', 'error');
-    });
-
-    socket.on('error', (error) => {
-        console.error('Room error:', error);
-        showNotification(error.message || 'Oda hatası', 'error');
-    });
+    // Bağlantıyı başlat
+    socket.connect();
+}
 }
 
 // ============ YouTube API Functions ============
@@ -556,76 +552,6 @@ function updateMediaButtonStates() {
     }
 }
 
-// ============ Event Listeners ============
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing room...');
-    
-    // Initialize socket connection
-    initializeSocket();
-    initializeChat();
-    
-    // Set up video overlay and modal
-    const videoOverlay = document.getElementById('videoOverlay');
-    const videoSearchInput = document.getElementById('videoSearchInput');
-    const videoResults = document.getElementById('videoResults');
-    const closeVideoModalBtn = document.getElementById('closeVideoModal');
-    const modalOverlay = document.getElementById('videoModalOverlay');
-
-    // Set up media control buttons
-    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
-    const toggleMicBtn = document.getElementById('toggleMicBtn');
-    const screenShareBtn = document.getElementById('screenShareBtn');
-    const settingsBtn = document.getElementById('settingsBtn');
-    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
-
-    // Initialize media controls
-    if (toggleCameraBtn) {
-        toggleCameraBtn.addEventListener('click', toggleCamera);
-    }
-
-    if (toggleMicBtn) {
-        toggleMicBtn.addEventListener('click', toggleMicrophone);
-    }
-
-    if (screenShareBtn) {
-        screenShareBtn.addEventListener('click', toggleScreenShare);
-    }
-
-    if (settingsBtn) {
-        settingsBtn.addEventListener('click', () => {
-            const modal = document.getElementById('settingsModal');
-            if (modal) modal.style.display = 'block';
-        });
-    }
-
-    if (leaveRoomBtn) {
-        leaveRoomBtn.addEventListener('click', leaveRoom);
-    }
-
-    if (videoOverlay) {
-        videoOverlay.addEventListener('click', showVideoModal);
-    }
-
-    if (videoSearchInput) {
-        videoSearchInput.addEventListener('input', debounce(handleVideoSearch, 500));
-    }
-
-    if (videoResults) {
-        videoResults.addEventListener('scroll', handleVideoScroll);
-    }
-
-    if (closeVideoModalBtn) {
-        closeVideoModalBtn.addEventListener('click', closeVideoModal);
-    }
-
-    if (modalOverlay) {
-        modalOverlay.addEventListener('click', closeVideoModal);
-    }
-
-    // Initialize media devices
-    initializeMediaDevices();
-});
-
 async function initializeMediaDevices() {
     try {
         // First try to get both video and audio
@@ -659,11 +585,67 @@ async function initializeMediaDevices() {
         // Update button states
         updateMediaButtonStates();
         
+        // Add event listeners for track changes
+        localStream.getTracks().forEach(track => {
+            track.addEventListener('ended', () => {
+                console.log('Track ended:', track.kind);
+                updateMediaButtonStates();
+            });
+            track.addEventListener('mute', () => {
+                console.log('Track muted:', track.kind);
+                updateMediaButtonStates();
+            });
+            track.addEventListener('unmute', () => {
+                console.log('Track unmuted:', track.kind);
+                updateMediaButtonStates();
+            });
+        });
     } catch (error) {
         console.error('Media devices error:', error);
         showNotification('Medya cihazlarına erişilemedi: ' + error.message, 'error');
     }
 }
+
+// ============ Event Listeners ============
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('DOM loaded, initializing room...');
+    
+    // Initialize everything
+    initializeSocket();
+    initializeChat();
+    
+    try {
+        await initializeMediaDevices();
+    } catch (error) {
+        console.error('Media devices initialization failed:', error);
+        showNotification('Medya cihazları başlatılamadı', 'error');
+    }
+
+    // Add event listeners
+    const searchBtn = document.getElementById('searchBtn');
+    const videoSearchInput = document.getElementById('videoSearchInput');
+    const videoResults = document.getElementById('videoResults');
+    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+    const toggleMicBtn = document.getElementById('toggleMicBtn');
+    const copyRoomLinkBtn = document.getElementById('copyRoomLinkBtn');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+    const sendMessageBtn = document.getElementById('sendMessageBtn');
+    const messageInput = document.getElementById('messageInput');
+
+    if (searchBtn) searchBtn.addEventListener('click', handleVideoSearch);
+    if (videoSearchInput) videoSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleVideoSearch();
+    });
+    if (videoResults) videoResults.addEventListener('scroll', handleVideoScroll);
+    if (toggleCameraBtn) toggleCameraBtn.addEventListener('click', toggleCamera);
+    if (toggleMicBtn) toggleMicBtn.addEventListener('click', toggleMicrophone);
+    if (copyRoomLinkBtn) copyRoomLinkBtn.addEventListener('click', copyRoomLink);
+    if (leaveRoomBtn) leaveRoomBtn.addEventListener('click', leaveRoom);
+    if (sendMessageBtn) sendMessageBtn.addEventListener('click', sendMessage);
+    if (messageInput) messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+});
 
 function extractVideoId(url) {
     if (!url) return null;
