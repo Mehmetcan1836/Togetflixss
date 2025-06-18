@@ -3,6 +3,7 @@ const NOTIFICATION_DURATION = 3000;
 
 // Global Variables
 let socket;
+let localStream;
 let player;
 let currentUser = {
     id: generateUserId(),
@@ -405,7 +406,11 @@ async function searchYouTubeVideos(query, pageToken = '') {
     try {
         if (!query) return null;
         
-        const API_KEY = 'AIzaSyAXwAfkwgrauvqXAi_Yo4QDRkIYQjVsUIc'; // Replace with your actual API key
+        const API_KEY = localStorage.getItem('youtubeApiKey') || 'AIzaSyB2jQGkX1zQpMzQdDQzQdDQzQdDQzQ';
+        if (!API_KEY) {
+            throw new Error('YouTube API anahtarı eksik');
+        }
+        
         const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=10&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}${pageToken ? '&pageToken=' + pageToken : ''}`);
         
         if (!response.ok) {
@@ -416,7 +421,7 @@ async function searchYouTubeVideos(query, pageToken = '') {
         return data;
     } catch (error) {
         console.error('YouTube search error:', error);
-        showNotification('Video arama hatası', 'error');
+        showNotification('Video arama hatası: ' + error.message, 'error');
         return null;
     }
 }
@@ -528,6 +533,29 @@ function closeVideoModal() {
     }
 }
 
+// ============ Media Button State Functions ============
+function updateMediaButtonStates() {
+    const cameraBtn = document.getElementById('toggleCameraBtn');
+    const micBtn = document.getElementById('toggleMicBtn');
+    
+    if (localStream) {
+        const videoTracks = localStream.getVideoTracks();
+        const audioTracks = localStream.getAudioTracks();
+        
+        if (videoTracks.length > 0) {
+            const isCameraEnabled = videoTracks[0].enabled;
+            cameraBtn.classList.toggle('active', isCameraEnabled);
+            cameraBtn.title = isCameraEnabled ? 'Kamera Kapalı' : 'Kamera Açık';
+        }
+        
+        if (audioTracks.length > 0) {
+            const isMicEnabled = audioTracks[0].enabled;
+            micBtn.classList.toggle('active', isMicEnabled);
+            micBtn.title = isMicEnabled ? 'Mikrofon Kapalı' : 'Mikrofon Açık';
+        }
+    }
+}
+
 // ============ Event Listeners ============
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM loaded, initializing room...');
@@ -607,26 +635,17 @@ async function initializeMediaDevices() {
                 audio: true 
             });
         } catch (err) {
-            // If that fails, try to get only audio
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: false, 
-                    audio: true 
-                });
-            } catch (audioErr) {
-                // If that fails too, try to get only video
-                try {
-                    localStream = await navigator.mediaDevices.getUserMedia({ 
-                        video: true, 
-                        audio: false 
-                    });
-                } catch (videoErr) {
-                    // If everything fails, show error
-                    console.error('Media devices error:', err);
-                    showNotification('Medya cihazlarına erişilemedi', 'error');
-                    return;
-                }
+            if (err.name === 'NotAllowedError') {
+                showNotification('Kamera ve mikrofona erişim izni verilmedi', 'error');
+            } else if (err.name === 'NotFoundError') {
+                showNotification('Kamera veya mikrofon bulunamadı', 'error');
+            } else if (err.name === 'NotReadableError') {
+                showNotification('Kamera veya mikrofon meşgul', 'error');
+            } else {
+                showNotification('Medya cihazları hatası: ' + err.message, 'error');
             }
+            console.error('Media devices error:', err);
+            return;
         }
         
         // Initially disable both tracks
@@ -642,7 +661,7 @@ async function initializeMediaDevices() {
         
     } catch (error) {
         console.error('Media devices error:', error);
-        showNotification('Medya cihazlarına erişilemedi', 'error');
+        showNotification('Medya cihazlarına erişilemedi: ' + error.message, 'error');
     }
 }
 

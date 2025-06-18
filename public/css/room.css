@@ -237,6 +237,7 @@
     border-radius: var(--radius-md);
     background-color: var(--surface);
     max-width: 80%;
+    margin-bottom: var(--spacing-sm);
 }
 
 .message.own {
@@ -263,6 +264,15 @@
 .message-content {
     color: var(--text-primary);
     word-break: break-word;
+}
+
+.reactions-container {
+    display: flex;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--surface);
+    border-radius: var(--radius-lg);
+    justify-content: center;
 }
 
 .chat-input {
@@ -410,10 +420,18 @@
 /* Media Controls */
 .controls-container {
     width: 100%;
-    padding: var(--spacing-md);
+    padding: 1rem;
     background-color: var(--surface);
     border-radius: var(--radius-lg);
-    margin-top: var(--spacing-md);
+    margin-top: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.room-info {
+    padding: 1rem;
+    background-color: var(--surface);
+    border-radius: var(--radius-lg);
+    margin-bottom: 1.5rem;
 }
 
 .media-controls {
@@ -423,9 +441,43 @@
     gap: var(--spacing-md);
 }
 
+.reaction-btn {
+    padding: 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    transition: all var(--transition-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+}
+
+.reaction-btn:hover {
+    background-color: var(--surface-light);
+    color: var(--primary);
+}
+
+.reaction-btn.media-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.reaction-btn.active {
+    background-color: var(--primary);
+    color: white;
+}
+
 .control-btn {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     border: none;
     background-color: var(--surface-light);
@@ -435,7 +487,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
+    padding: 0.5rem;
+    font-size: 1.2rem;
+    margin: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .control-btn:hover {
