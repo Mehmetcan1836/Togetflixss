@@ -11,7 +11,7 @@ let currentUser = {
     isHost: false
 };
 let roomId = window.location.pathname.split('/').pop();
-let localStream = null;
+
 let screenStream = null;
 let nextPageToken = '';
 let isSearching = false;
