@@ -100,6 +100,63 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
+// ============ YouTube API Functions ============
+async function searchYouTubeVideos(query, pageToken = '') {
+    try {
+        const response = await fetch(`/api/search/youtube?q=${encodeURIComponent(query)}&pageToken=${pageToken}`);
+        const data = await response.json();
+        displayVideoResults(data.items, false);
+        return data.nextPageToken;
+    } catch (error) {
+        console.error('YouTube search error:', error);
+        showNotification('YouTube araması başarısız oldu', 'error');
+    }
+}
+
+function displayVideoResults(videos, append = false) {
+    const videoResults = document.getElementById('videoResults');
+    const videoList = append ? videoResults.querySelector('.video-list') : document.createElement('div');
+    videoList.className = 'video-list';
+
+    videos.forEach(video => {
+        const videoItem = document.createElement('div');
+        videoItem.className = 'video-item';
+        videoItem.innerHTML = `
+            <img src="${video.snippet.thumbnails.medium.url}" alt="${video.snippet.title}">
+            <div class="video-info">
+                <h3>${video.snippet.title}</h3>
+                <p>${video.snippet.channelTitle}</p>
+            </div>
+        `;
+        videoItem.addEventListener('click', () => {
+            loadYouTubeVideo(video.id.videoId);
+        });
+        videoList.appendChild(videoItem);
+    });
+
+    if (!append) {
+        videoResults.innerHTML = '';
+        videoResults.appendChild(videoList);
+    }
+}
+
+async function loadYouTubeVideo(videoId) {
+    try {
+        player.loadVideoById(videoId);
+        document.getElementById('videoOverlay').style.display = 'none';
+        
+        if (socket) {
+            socket.emit('video-load', {
+                videoId,
+                userId: socket.id
+            });
+        }
+    } catch (error) {
+        console.error('Video load error:', error);
+        showNotification('Video yüklenemedi', 'error');
+    }
+}
+
 function onPlayerReady(event) {
     console.log('Player ready');
 }
@@ -140,6 +197,100 @@ async function toggleCamera() {
 
 async function toggleMicrophone() {
     await toggleMediaTrack('Mikrofon', 'toggleMicBtn', 'audio');
+}
+
+// ============ Media Button State Functions ============
+function updateMediaButtonStates() {
+    const cameraBtn = document.getElementById('toggleCameraBtn');
+    const micBtn = document.getElementById('toggleMicBtn');
+    const screenBtn = document.getElementById('screenShareBtn');
+    
+    if (localStream) {
+        const videoTracks = localStream.getVideoTracks();
+        const audioTracks = localStream.getAudioTracks();
+        
+        if (videoTracks.length > 0) {
+            const isCameraEnabled = videoTracks[0].enabled;
+            cameraBtn.classList.toggle('active', isCameraEnabled);
+            cameraBtn.title = isCameraEnabled ? 'Kamera Kapalı' : 'Kamera Açık';
+        }
+        
+        if (audioTracks.length > 0) {
+            const isMicEnabled = audioTracks[0].enabled;
+            micBtn.classList.toggle('active', isMicEnabled);
+            micBtn.title = isMicEnabled ? 'Mikrofon Kapalı' : 'Mikrofon Açık';
+        }
+    }
+    
+    if (screenStream) {
+        screenBtn.classList.add('active');
+        screenBtn.title = 'Ekran Paylaşımı Aktif';
+    } else {
+        screenBtn.classList.remove('active');
+        screenBtn.title = 'Ekran Paylaşımı';
+    }
+}
+
+async function initializeMediaDevices() {
+    try {
+        console.log('Initializing media devices...');
+        localStream = null;
+        
+        try {
+            // First try to get both video and audio
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: true, 
+                    audio: true 
+                });
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    showNotification('Kamera ve mikrofona erişim izni verilmedi', 'error');
+                } else if (err.name === 'NotFoundError') {
+                    showNotification('Kamera veya mikrofon bulunamadı', 'error');
+                } else if (err.name === 'NotReadableError') {
+                    showNotification('Kamera veya mikrofon meşgul', 'error');
+                } else {
+                    showNotification('Medya cihazları hatası: ' + err.message, 'error');
+                }
+                console.error('Media devices error:', err);
+                return;
+            }
+            
+            // Initially disable both tracks
+            if (localStream.getVideoTracks().length > 0) {
+                localStream.getVideoTracks().forEach(track => track.enabled = false);
+            }
+            if (localStream.getAudioTracks().length > 0) {
+                localStream.getAudioTracks().forEach(track => track.enabled = false);
+            }
+            
+            // Update button states
+            updateMediaButtonStates();
+            
+            // Add event listeners for track changes
+            localStream.getTracks().forEach(track => {
+                track.addEventListener('ended', () => {
+                    console.log('Track ended:', track.kind);
+                    updateMediaButtonStates();
+                });
+                track.addEventListener('mute', () => {
+                    console.log('Track muted:', track.kind);
+                    updateMediaButtonStates();
+                });
+                track.addEventListener('unmute', () => {
+                    console.log('Track unmuted:', track.kind);
+                    updateMediaButtonStates();
+                });
+            });
+        } catch (error) {
+            console.error('Failed to initialize media devices:', error);
+            showNotification('Medya cihazları başlatılamadı', 'error');
+        }
+    } catch (error) {
+        console.error('Media initialization error:', error);
+        showNotification('Medya cihazları başlatılamadı', 'error');
+    }
 }
 
 async function toggleScreenShare() {
@@ -627,6 +778,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const videoResults = document.getElementById('videoResults');
     const toggleCameraBtn = document.getElementById('toggleCameraBtn');
     const toggleMicBtn = document.getElementById('toggleMicBtn');
+    const screenShareBtn = document.getElementById('screenShareBtn');
     const copyRoomLinkBtn = document.getElementById('copyRoomLinkBtn');
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const sendMessageBtn = document.getElementById('sendMessageBtn');
@@ -639,6 +791,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (videoResults) videoResults.addEventListener('scroll', handleVideoScroll);
     if (toggleCameraBtn) toggleCameraBtn.addEventListener('click', toggleCamera);
     if (toggleMicBtn) toggleMicBtn.addEventListener('click', toggleMicrophone);
+    if (screenShareBtn) screenShareBtn.addEventListener('click', toggleScreenShare);
     if (copyRoomLinkBtn) copyRoomLinkBtn.addEventListener('click', copyRoomLink);
     if (leaveRoomBtn) leaveRoomBtn.addEventListener('click', leaveRoom);
     if (sendMessageBtn) sendMessageBtn.addEventListener('click', sendMessage);
@@ -647,6 +800,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
+// ============ Helper Functions ============
 function extractVideoId(url) {
     if (!url) return null;
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;

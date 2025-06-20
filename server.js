@@ -12,6 +12,38 @@ const io = require('socket.io')(http, {
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
+const { google } = require('googleapis');
+
+// YouTube API Configuration
+const YOUTUBE_API_KEY = 'AIzaSyDVhKUC83wcj6Q_3auQVLnjRJFB_HzIom0';
+const youtube = google.youtube({
+    version: 'v3',
+    auth: YOUTUBE_API_KEY
+});
+
+// YouTube video search endpoint
+app.get('/api/search/youtube', async (req, res) => {
+    try {
+        const { q, pageToken } = req.query;
+        
+        const response = await youtube.search.list({
+            part: 'snippet',
+            type: 'video',
+            q,
+            maxResults: 10,
+            pageToken,
+            order: 'relevance'
+        });
+
+        res.json({
+            items: response.data.items,
+            nextPageToken: response.data.nextPageToken
+        });
+    } catch (error) {
+        console.error('YouTube search error:', error);
+        res.status(500).json({ error: 'YouTube search failed' });
+    }
+});
 
 const PORT = process.env.PORT || 3000;
 
